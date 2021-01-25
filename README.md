@@ -7,13 +7,17 @@ This wrapper script is intended for the use at the AMR lab at Stavanger Universi
 ## Table of Contents
 [Details](#Details)
 [Computer requirements](#Requirements)  
-[Input files](#Input-files)  
+[Input files](#Input)  
 [Example Usage](#Basic-usage)  
 [Usage](#Usage)  
 [Output](#Output)
 
 ## Details
-This script takes an ONT sequencing run, with or without barcodes,
+This script takes an ONT sequencing run, with or without barcodes, and performs basecalling and demultiplexing using the parameters described in https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html. It then runs the ARTIC pipeline via Nextflow (https://github.com/connor-lab/ncov2019-artic-nf) to produce consensus.fasta files for your Sars-CoV-2 genomes to be used in downstream analysis, such as pangolin lineage assignment or for upload to the GISAID database.
+
+## QC
+Enter details about QC.
+20 reads?
 
 ## Requirements
 These need to be installed and in path for the entire pipeline to work. Other versions of these tools will possibly work too, but these are the ones I have tested.
@@ -29,9 +33,10 @@ conda env create --prefix /home/susamr/Programs/ncov2019-artic-nf/work7Conda/ --
 ```
 
 
-## Input files
+## Input
 * The script takes as input the folder where your fast5 files are placed. This can be in a folder called fast5_pass, or if using both fast5_pass and fast5_fail, use the parent directory as input, and it will recursively search for fast5 files.
 * The script also needs to know where the ncov2019-artic-nf/ directory is placed. By default, the script assumes it is placed at ~/Programs/ncov2019-artic-nf/
+* You must also specify barcodes: 1-12, 12-24 or both
 
 ## Usage:
 
