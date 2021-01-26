@@ -287,6 +287,10 @@ def main():
     run_command([listToString(nextflow_command)], shell=True)
 
 
+    ##Pangolin lineage assignment
+    #subprocess.call(["activate", value])
+    #subprocess.run('source activate environment-name && "enter command here" && source deactivate', shell=True)
+
 
 
 
