@@ -168,3 +168,12 @@ Base
 
 #Filnavngivning
 En bokstav (kode)
+
+
+#ALSO adda a section about how to install all the tools
+
+#ARTIC v1.2.1
+#Nextflow pipeline, where:
+Specify artic version
+Install and then specify conda environment
+Primer scheme too
