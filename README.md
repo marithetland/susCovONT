@@ -1,4 +1,7 @@
 # covid-genomics
+
+NOTE THIS IS CURRENTLY BEING DEVELOPED PLEASE DO NOT USE.
+
 Wrapper to basecall and demultiplex Sars-CoV-2 samples from ONT sequencing runs, then running the artic pipeline and finally assigning lineage with pangloin. 
 
 This wrapper script is intended for the use at the AMR lab at Stavanger University Hospital. It performs basecalling and demultiplexing of fast5 files from a nanopore sequencing run. It takes as input the fast5-folder from your sequencing run and will output a consensus.fasta sequence which you can use for further analyses (e.g. phylogeny, pangolin, etc.).
@@ -208,3 +211,25 @@ Prøvenavnene bør ha en logisk navngivning slik at de lett kan bli funnet eller
 4. P + et siffer som indikerer hvilken "parallell" dette er - P0 hvis det er
 
 En bokstav (kode)
+
+
+
+##NOTE you must be online (internet) because nextflow downloads the primer schemes
+
+
+##Add option for nextflow or artic pipeline (if only doing one)
+## Add option for threads
+
+
+
+
+##More edits in nextflow pipeline dir
+
+Edit the file ./conf/base.config: Set nanopolish = false to nanopolish = true
+
+#The file resources.config is set to 4 threads (cpus = 4). This can be changed.
+
+The command for running nextflow with the --cache added and remove nanopolish as it is now in config:
+```
+nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --cache /home/marit/Programs/conda_for_covid/work/conda --prefix nextflow --basecalled_fastq /media/marit/picard/sars-cov-2__routine/test/003_demultiplexed --fast5_pass /media/marit/picard/sars-cov-2__routine/test/001_raw_fast5s/fast5_pass/new_copy --sequencing_summary /media/marit/picard/sars-cov-2__routine/test/002_basecalled/sequencing_summary.txt --outdir 004_nextflow_two_three_four_fem_sekss
+```
