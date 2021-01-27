@@ -50,8 +50,24 @@ The following directories are created:
 
 
 
-## Pangolin
+## Installations
 
+#Artic
+```
+conda create -n artic
+conda activate artic
+conda install -c bioconda -c conda-forge artic
+```
+
+#Nextflow pipeline
+```
+cd ~/Programs
+git clone https://github.com/connor-lab/ncov2019-artic-nf
+sed -i.bak 's/artic=1.1.3/artic=1.2.1/g' ncov2019-artic-nf/environments/nanopore/environment.yml
+```
+First time you run the nextflow the necessary conda env will be created
+
+#Pangolin
 Install pangolin as per the github instructions found here: https://github.com/cov-lineages/pangolin
 
 ```
@@ -166,8 +182,6 @@ artic minion --normalise 200 --threads 4 --scheme-directory ~/Programs/artic-nco
 ##Input
 Base 
 
-#Filnavngivning
-En bokstav (kode)
 
 
 #ALSO adda a section about how to install all the tools
@@ -177,3 +191,20 @@ En bokstav (kode)
 Specify artic version
 Install and then specify conda environment
 Primer scheme too
+
+
+
+
+##### Basecalling
+Basecalling of a run of 223Gb (2408 fast5 files) takes approximately 6 hours 15 minutes.
+
+
+#Filnavngivning
+Prøvenavnene bør ha en logisk navngivning slik at de lett kan bli funnet eller plukket ut senere
+
+1. Først en bokstav som koder for V=papirrekvisisjon, E=elektronisk rekvisisjon
+2. 7 sifre som er kode for pasienten?
+3. understrek
+4. P + et siffer som indikerer hvilken "parallell" dette er - P0 hvis det er
+
+En bokstav (kode)
