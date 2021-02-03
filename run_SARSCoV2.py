@@ -127,6 +127,11 @@ def check_artic_version():
     run_command(['echo -n "artic \t" >> pipeline_versions.txt ;~/Programs/conda_for_covid/artic-2c6f8ebeb615d37ee3372e543ec21891/bin/artic --version >> pipeline_versions.txt'], shell=True) ##Check for empty results, skip
     pass
 
+#TODO: def check_pangolin_version():
+#    run_command(['echo -n "artic \t" >> pipeline_versions.txt ;~/Programs/conda_for_covid/artic-2c6f8ebeb615d37ee3372e543ec21891/bin/artic --version >> pipeline_versions.txt'], shell=True) ##Check for empty results, skip
+#    pass
+
+
 #def check_ncov2019_nextflow_exists():
 #    if not os.path.exists(os.path.join(os.getcwd(),fast5_pass)):
 #    pass
@@ -137,6 +142,64 @@ def fileCount(path, extension):
     for root, dirs, files in os.walk(path):
         count += sum(f.endswith(extension) for f in files)
     return count
+
+def check_fast5(args): ##This can be done neater
+     #Check that the input dir exists
+    if not args.input_dir.is_dir():
+        sys.exit('Error: {} is not a directory'.format(args.in_dir))
+    #Check that the fast5_pass folder is present and count number of FAST5 files
+    full_path = os.path.abspath(args.input_dir)
+    fast5_pass=(full_path+"/fast5_pass/")
+    fast5_pass_alt=(full_path+"/001_fast5_pass/")
+    if not os.path.exists(os.path.join(os.getcwd(),fast5_pass)):
+        if os.path.exists(os.path.join(os.getcwd(),fast5_pass_alt)):
+            len_fast5=fileCount(fast5_pass_alt, '.fast5')
+            if len_fast5 != 0:
+                print("Found directory 001_fast5_pass with " + str(len_fast5) + " .fast5 files to analyse")
+                raw_fast5s=fast5_pass_alt
+            else:
+                sys.exit('Error: Found no .fast5 files')
+        else:
+            sys.exit('Error: {} is not a directory'.format(fast5_pass))
+    if os.path.exists(os.path.join(os.getcwd(),fast5_pass)):
+        len_fast5=fileCount(fast5_pass, '.fast5')
+        if len_fast5 != 0:
+            print("Found directory fast5_pass with " + str(len_fast5) + " .fast5 files to analyse")
+            raw_fast5s=fast5_pass
+        else:
+            sys.exit('Error: Found no .fast5 files')
+
+    return raw_fast5s
+
+def check_fastq(args): ##This can be done neater
+    #Check if the fastq_pass folder is present
+    full_path = os.path.abspath(args.input_dir)
+    fastq_pass=(full_path+"/fastq_pass/")
+    fastq_pass_alt=(full_path+"/002_basecalled/")
+    fastq_pass_alt_2=(full_path+"/003_demultiplexed/")
+    if os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
+        print("Found fastq_pass folder. Checking for demultiplexed files (split into barcodes)")
+        #TODO: ADD check for barcodes (nextflow pipeline can handle this)
+        sequencing_summary=(full_path+"/sequencing_summary*.txt")  #split run name to the last two "_"s to get this name properly
+        basecalled_fastq=fastq_pass
+    if not os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
+        if os.path.exists(os.path.join(os.getcwd(),fastq_pass_alt)):
+            print("Found fastq_pass folder in directory 002_basecalled.")
+            sequencing_summary=(fastq_pass_alt+"sequencing_summary.txt")
+            if os.path.exists(os.path.join(os.getcwd(),fastq_pass_alt_2)):
+                basecalled_fastq=fastq_pass_alt_2
+            if not os.path.exists(os.path.join(os.getcwd(),fastq_pass_alt_2)):
+                basecalled_fastq=fastq_pass_alt
+        else:
+            print("No fastq_pass folder found. Will perform guppy basecalling and demultiplexing")
+    len_fastq=fileCount(basecalled_fastq, '.fastq')
+    if len_fastq != 0:
+        print("Found directory fastq_pass with " + str(len_fastq) + " .fastq files to analyse")
+    else:
+        sys.exit('Error: Found no .fastq files')
+
+    return basecalled_fastq, sequencing_summary
+
 
 def check_arguments(args):
     '''Check that the arguments are satisfied.'''
@@ -150,39 +213,7 @@ def check_arguments(args):
     if args.basecalling_model not in model_choices:
         sys.exit('Error: valid --model choices are: {}'.format(join_with_or(model_choices)))
 
-    #Check that the input dir exists
-    if not args.input_dir.is_dir():
-        sys.exit('Error: {} is not a directory'.format(args.in_dir))
-    #Check that the fast5_pass folder is present and count number of FAST5 files
-    full_path = os.path.abspath(args.input_dir)
-    fast5_pass=(full_path+"/fast5_pass/")
-    fast5_pass_alt=(full_path+"/001_fast5_pass/")
-    if not os.path.exists(os.path.join(os.getcwd(),fast5_pass)):
-        if os.path.exists(os.path.join(os.getcwd(),fast5_pass_alt)):
-            len_fast5=fileCount(fast5_pass_alt, '.fast5')
-            if len_fast5 != 0:
-                print("Found directory 001_fast5_pass with " + str(len_fast5) + " .fast5 files to analyse")
-            else:
-                sys.exit('Error: Found no .fast5 files')
-        else:
-            sys.exit('Error: {} is not a directory'.format(fast5_pass))
-    if os.path.exists(os.path.join(os.getcwd(),fast5_pass)):
-        len_fast5=fileCount(fast5_pass, '.fast5')
-        if len_fast5 != 0:
-            print("Found directory fast5_pass with " + str(len_fast5) + " .fast5 files to analyse")
-        else:
-            sys.exit('Error: Found no .fast5 files')
 
-    #Check if the fastq_pass folder is present
-    fastq_pass=(full_path+"/fastq_pass/")
-    fastq_pass_alt=(full_path+"/002_basecalled/")
-    if os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
-        print("Found fastq_pass folder. Checking for demultiplexed files (split into barcodes)")
-    if not os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
-        if os.path.exists(os.path.join(os.getcwd(),fastq_pass_alt)):
-            print("Found fastq_pass folder in directory 002_basecalled")
-        else:
-            print("No fastq_pass folder found. Will perform guppy basecalling and demultiplexing")
 
     #TODO: Check if Nextflow has already been run (007_nextflow + "nextflowSucess.txt")
 
@@ -191,7 +222,7 @@ def check_arguments(args):
     #TODO: Add check for outdir if different than input dir
 
 
-def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, resume, cpu, chunks):
+def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, resume, cpu):
     #guppy_basecaller -c dna_r9.4.1_450bps_hac.cfg -i ../fast5_pass -s 002_basecalled -x auto -r 
     #Example command: guppy_basecaller -c dna_r9.4.1_450bps_hac.cfg -i /path/to/reads -s run_name -x auto -r
 
@@ -208,7 +239,7 @@ def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, resume
     if resume:
          basecalling_command += ['--resume']  #add option to resume
     
-    print(basecalling_command)
+    print(listToString(basecalling_command))
     return basecalling_command
 
 def get_guppy_barcoder_command(input_dir, save_dir, barcode_kit):
@@ -222,7 +253,7 @@ def get_guppy_barcoder_command(input_dir, save_dir, barcode_kit):
     #if resume:
     #     guppy_command += ['--resume']  #add option to resume
     
-    print(barcoding_command)
+    print(listToString(barcoding_command))
     return barcoding_command
 
 def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_outdir,run_name):
@@ -236,21 +267,19 @@ def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_
                      '--sequencing_summary  ', sequencing_summary,
                      '--outdir ', nf_outdir]
     
-    print(nextflow_command)
+    print(listToString(nextflow_command))
     return nextflow_command
 
-def get_pangolin_command(consensus_dir):
+def get_pangolin_command(consensus_dir,pangolin_outdir):
     #conda update pangolin?
     #conda activate pangolin; pangolin file --outfile outfile ; pangolin deactivate
     #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --cache /home/marit/Programs/conda_for_covid/work/conda --prefix 210124_FAO88582_CoV_NB1-24   --basecalled_fastq ./003_demultiplexed --fast5_pass ./001_raw_fast5s/fast5_pass/new_copy     # --sequencing_summary ./002_basecalled/sequencing_summary.txt --outdir test_nextflow
-    pangolin_command = ['nextflow run ~/Programs/ncov2019-artic-nf -profile conda --nanopolish --cache /home/marit/Programs/conda_for_covid/work/conda ',
-                     '--prefix', run_name, 
-                     '--basecalled_fastq', demultiplexed_fastq, 
-                     '--fast5_pass', fast5_pass,
-                     '--sequencing_summary  ', sequencing_summary,
-                     '--outdir ', nf_outdir]
+    pangolin_command = ['bash -c "source activate pangolin ; ',
+                        'pangolin sequences.fasta ',
+                        '--outdir ', pangolin_outdir,
+                        '; source deactivate"']
     
-    print(pangolin_command)
+    print(listToString(pangolin_command))
     return pangolin_command
 
 def get_nextclade_command(consensus_dir):
@@ -263,7 +292,7 @@ def get_nextclade_command(consensus_dir):
                      '--sequencing_summary  ', sequencing_summary,
                      '--outdir ', nf_outdir]
     
-    print(nextclade_command)
+    print(listToString(nextclade_command))
     return nextclade_command
 
 def yes_or_no(question):
@@ -301,13 +330,25 @@ def main():
     if outdir[-1] != '/':
         outdir = outdir + '/'
 
+    
+    print("test")
+    raw_fast5=check_fast5(args)
+    print(raw_fast5)
+    basecalled_fastq,sequencing_summary=check_fastq(args)
+    print(basecalled_fastq)
+    print(sequencing_summary)
+    print("test end")
+
     #raw_fast5s=os.path.abspath(str(args.input_fast5))
-    basecalled_fastq=(outdir+'002_basecalled/') #depends
-    demultiplexed_fastq=(outdir+'003_demultiplexed/')
+    #basecalled_fastq=(outdir+'002_basecalled/') #depends
+    #demultiplexed_fastq=(outdir+'003_demultiplexed/') #depends
+    #sequencing_summary=(outdir+'002_basecalled/'+'sequencing_summary.txt') #depends on how it was done
     nf_outdir=(outdir+'004_artic_minion/')
     consensus_dir=(outdir+'005_consensus_fasta/')
-    sequencing_summary=(outdir+'002_basecalled/'+'sequencing_summary.txt') #depends on how it was done
-    barcode_list=(args.sample_names)
+    barcode_list=(args.sample_names) #must check that it is correct format
+    pangolin_outdir=(outdir+'006_pangolin/')
+    nextclade_outdir=(outdir+'007_nextclade/')
+
 
     #Check that fast5_pass directory is present in input_dir:
 
@@ -326,7 +367,7 @@ def main():
     logging.info("##########CHECKPOINT##########")
     #Check necessary arguments, set variables and set up output directory
     check_python_version()
-    check_guppy_version()
+    #check_guppy_version()
     check_nextflow_version()
     check_artic_version()
     #TODO: # check_ncov2019_nextflow_exists() #check only if not default
@@ -342,29 +383,27 @@ def main():
     while True:
         if(yes_or_no('Would you like to run this pipeline? y/n: ')):
             break
-    ##
+    ##ADD start and end time of run
 
     ##Guppy basecalling
     #TODO: add check if basecalling has already been performed
     #if not args.basecalled:
-        #Run basecalling
-      #  basecalling_command=(get_guppy_basecalling_command(raw_fast5s, basecalled_fastq, basecaller_mode, args.resume_basecalling, args.cpu, args.chunks_per_runner))
-     #   run_command([listToString(basecalling_command)], shell=True)
+    #Run basecalling
+    basecalling_command=(get_guppy_basecalling_command(raw_fast5, basecalled_fastq, basecaller_mode, args.resume_basecalling, args.cpu))
+    #run_command([listToString(basecalling_command)], shell=True)
+    
     #if not args.demultiplexed:
-        ##Guppy demultiplexing
-        #demultiplexing_command=(get_guppy_barcoder_command(basecalled_fastq, demultiplexed_fastq, barcode_kit))
-        #run_command([listToString(demultiplexing_command)], shell=True)
+    ##Guppy demultiplexing
+    #demultiplexing_command=(get_guppy_barcoder_command(basecalled_fastq, demultiplexed_fastq, barcode_kit))
+    #run_command([listToString(demultiplexing_command)], shell=True)
 
-    ##Run artic guppyplex and artic minion via PHW's nextflow pipeline
-    #nextflow_command=(get_nextflow_command(demultiplexed_fastq, raw_fast5s, sequencing_summary,nf_outdir,run_name))
-    #run_command([listToString(nextflow_command)], shell=True)
+    ##Run artic guppyplex and artic minion via PHW's nextflow pipeline - this works
+    nextflow_command=(get_nextflow_command(basecalled_fastq, raw_fast5, sequencing_summary,nf_outdir,run_name))
+    run_command([listToString(nextflow_command)], shell=True)
 
-    ##Pangolin lineage assignment
-    #subprocess.call(["activate", value])
-    #subprocess.run('source activate environment-name && "enter command here" && source deactivate', shell=True)
-    #consensus_dir
-    #pangolin_command=(get_pangolin_command(consensus_dir))
-    #run_command([listToString(pangolin_command)], shell=True)
+    ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
+    pangolin_command=(get_pangolin_command(consensus_dir,pangolin_outdir))
+    run_command([listToString(pangolin_command)], shell=True)
 
     ##Nextclade lineage assignment and substitutions
     #As input: consensus_dir
