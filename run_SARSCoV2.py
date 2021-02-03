@@ -302,7 +302,7 @@ def main():
         outdir = outdir + '/'
 
     #raw_fast5s=os.path.abspath(str(args.input_fast5))
-    basecalled_fastq=(outdir+'002_basecalled/')
+    basecalled_fastq=(outdir+'002_basecalled/') #depends
     demultiplexed_fastq=(outdir+'003_demultiplexed/')
     nf_outdir=(outdir+'004_artic_minion/')
     consensus_dir=(outdir+'005_consensus_fasta/')
