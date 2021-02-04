@@ -22,6 +22,7 @@ import os, sys, re
 import shutil
 import csv
 import pandas as pd
+from functools import reduce
 from argparse import ArgumentParser
 import subprocess
 from Bio import SeqIO
@@ -88,6 +89,11 @@ def listToString(s):
     # return string   
     return (str1.join(s)) 
 
+def combineCommand(s):  
+    # initialize an empty string 
+    str2 = "" 
+    # return string   
+    return (str2.join(s)) 
 
 def run_command(command, **kwargs): #yekwahs
     command_str = ''.join(command)
@@ -192,11 +198,11 @@ def check_fastq(args): ##This can be done neater
                 basecalled_fastq=fastq_pass_alt
         else:
             print("No fastq_pass folder found. Will perform guppy basecalling and demultiplexing")
+            basecalled_fastq=(full_path+'/002_basecalled/')
+            sequencing_summary=(full_path+'/002_basecalled/sequencing_summary.txt')
     len_fastq=fileCount(basecalled_fastq, '.fastq')
     if len_fastq != 0:
         print("Found directory fastq_pass with " + str(len_fastq) + " .fastq files to analyse")
-    else:
-        sys.exit('Error: Found no .fastq files')
 
     return basecalled_fastq, sequencing_summary
 
@@ -270,29 +276,30 @@ def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_
     print(listToString(nextflow_command))
     return nextflow_command
 
-def get_pangolin_command(consensus_dir,pangolin_outdir):
+def get_pangolin_command(consensus_file,pangolin_outdir):
     #conda update pangolin?
     #conda activate pangolin; pangolin file --outfile outfile ; pangolin deactivate
     #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --cache /home/marit/Programs/conda_for_covid/work/conda --prefix 210124_FAO88582_CoV_NB1-24   --basecalled_fastq ./003_demultiplexed --fast5_pass ./001_raw_fast5s/fast5_pass/new_copy     # --sequencing_summary ./002_basecalled/sequencing_summary.txt --outdir test_nextflow
     pangolin_command = ['bash -c "source activate pangolin ; ',
-                        'pangolin sequences.fasta ',
+                        'pangolin ', consensus_file,
                         '--outdir ', pangolin_outdir,
-                        '; source deactivate"']
+                        '--threads 20 "']
     
     print(listToString(pangolin_command))
     return pangolin_command
 
-def get_nextclade_command(consensus_dir):
-    #docker pull image first
-    #    #sudo docker run -it --rm -u 1001 --volume="${PWD}:/seq" neherlab/nextclade nextclade --input-fasta '/seq/sequences.fasta' --output-csv '/seq/results.csv'
-    nextclade_command = ['nextflow run ~/Programs/ncov2019-artic-nf -profile conda --nanopolish --cache /home/marit/Programs/conda_for_covid/work/conda ',
-                     '--prefix', run_name, 
-                     '--basecalled_fastq', demultiplexed_fastq, 
-                     '--fast5_pass', fast5_pass,
-                     '--sequencing_summary  ', sequencing_summary,
-                     '--outdir ', nf_outdir]
+def get_nextclade_command(run_name,consensus_dir,nextclade_outdir):
+    #docker pull neherlab/nextclade:latest
+    #docker run -it --rm -u 1001 --volume="${PWD}:/seq" neherlab/nextclade nextclade --input-fasta '/seq/TEST_new_script_sequences.fasta' --output-csv '/seq/results.csv'
+    consensus_base=(run_name+'_sequences.fasta')
+    os.mkdir(nextclade_outdir) #TODO: ADD TRY
+    nextclade_command = ['docker pull neherlab/nextclade:latest ; ',
+                     'docker run -it --rm -u 1001 --volume="',consensus_dir, 
+                     ':/seq"  neherlab/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
+                     '\' --output-csv \'/seq/',consensus_base,'_nextclade.csv\' ; '
+                     'mv ',consensus_dir+consensus_base,'_nextclade.csv ',nextclade_outdir,'']
     
-    print(listToString(nextclade_command))
+    print(combineCommand(nextclade_command))
     return nextclade_command
 
 def yes_or_no(question):
@@ -305,6 +312,50 @@ def yes_or_no(question):
         return sys.exit()
     else:
         return yes_or_no("Please Enter (y/n) ")
+
+def copy_to_consensus(consensus_dir, artic_outdir, run_name):
+    os.mkdir(consensus_dir) #TODO: ADD TRY
+    outfilename=(consensus_dir+run_name+'_sequences.fasta')
+    with open(outfilename, 'w') as outfile:
+        for dirpath, dirs, files in os.walk(artic_outdir):
+            for filename in files:
+                if filename.endswith('.consensus.fasta'):
+                    os.symlink(dirpath+filename, consensus_dir+filename)
+                    with open(consensus_dir+filename, 'r') as readfile:
+                        outfile.write(readfile.read() + "\n\n") 
+    consensus_file=outfilename
+    return consensus_file
+
+def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_names):
+    print("Run: " +run_name)
+    print("Nextclade file: "+nextclade_outfile)
+    print("Pangolin file: "+pangolin_outfile)
+    print("Artic QC file: "+artic_qc)
+    print("Sample names: "+sample_names) #ignore if header
+
+    #Read in files to dataframes
+    artic_df = pd.read_csv(artic_qc, sep=',', header=0, encoding='utf8', engine='python')
+    nclade_df = pd.read_csv(nextclade_outfile, sep=';', header=0, encoding='utf8', engine='python')
+    pangolin_df = pd.read_csv(pangolin_outfile, sep=',', header=0, encoding='utf8', engine='python')
+    sample_df = pd.read_csv(sample_names, sep=',', header=0, encoding='utf8', engine='python')
+    
+    #Make sure all have colname "barcode" for merging
+    artic_df  = artic_df.rename(columns={'sample_name': 'barcode'})
+    nclade_df  = nclade_df.rename(columns={'seqName': 'barcode'})
+    pangolin_df = pangolin_df.rename(columns={'taxon': 'barcode'})
+
+    #Get uniform "barcode" column for each of the dataframes. Format: run_name+barcode_number
+    nclade_df[['run_barcode', 'temp','temp2']] = nclade_df['barcode'].str.split('/', 2, expand=True)
+    nclade_df_RB = pd.DataFrame([x.rsplit('_', 1) for x in nclade_df.run_barcode.tolist()], columns=['run', 'barcode'])
+    print(nclade_df_RB)
+
+    # #Merge dataframe
+    # data_frames = [sample_df, pangolin_df, artic_df, nclade_df]
+    # df_merged = reduce(lambda  left,right: pd.merge(left,right,on=['barcode'], how='outer'), data_frames)
+    # #Save to CSV
+    # pd.DataFrame.to_csv(df_merged, 'merged.txt', sep=',', na_rep='.', index=False)
+    # ##ATODO:DD run name to each line. Add versions to each line also?
+    #TODO: ADD other versions?
 
 #main
 def main():    
@@ -341,14 +392,17 @@ def main():
 
     #raw_fast5s=os.path.abspath(str(args.input_fast5))
     #basecalled_fastq=(outdir+'002_basecalled/') #depends
-    #demultiplexed_fastq=(outdir+'003_demultiplexed/') #depends
+    demultiplexed_fastq=(outdir+'003_demultiplexed/') #depends
     #sequencing_summary=(outdir+'002_basecalled/'+'sequencing_summary.txt') #depends on how it was done
     nf_outdir=(outdir+'004_artic_minion/')
+    artic_outdir=(outdir+'004_artic_minion/articNcovNanopore_sequenceAnalysisNanopolish_articMinIONNanopolish/')
     consensus_dir=(outdir+'005_consensus_fasta/')
-    barcode_list=(args.sample_names) #must check that it is correct format
     pangolin_outdir=(outdir+'006_pangolin/')
     nextclade_outdir=(outdir+'007_nextclade/')
-
+    nextclade_outfile=(outdir+'007_nextclade/'+run_name+'_sequences.fasta_nextclade.csv')
+    pangolin_outfile=(outdir+'006_pangolin/lineage_report.csv')
+    artic_qc=(outdir+'004_artic_minion/'+run_name+'.qc.csv')
+    sample_names=(outdir+'sample_names.csv') #must check that it is correct format
 
     #Check that fast5_pass directory is present in input_dir:
 
@@ -377,7 +431,7 @@ def main():
     check_arguments(args)
     print("The input folder is: " + full_path)
     print("The name of your run is: " + run_name)
-    print("Your barcodes are specified in: " + barcode_list)
+    print("Your barcodes are specified in: " + sample_names)
     print("Specified barcode kit is: " + barcode_kit)
     print("Using basecaller mode: " + basecaller_mode)
     while True:
@@ -389,7 +443,7 @@ def main():
     #TODO: add check if basecalling has already been performed
     #if not args.basecalled:
     #Run basecalling
-    basecalling_command=(get_guppy_basecalling_command(raw_fast5, basecalled_fastq, basecaller_mode, args.resume_basecalling, args.cpu))
+    #basecalling_command=(get_guppy_basecalling_command(raw_fast5, basecalled_fastq, basecaller_mode, args.resume_basecalling, args.cpu))
     #run_command([listToString(basecalling_command)], shell=True)
     
     #if not args.demultiplexed:
@@ -398,21 +452,22 @@ def main():
     #run_command([listToString(demultiplexing_command)], shell=True)
 
     ##Run artic guppyplex and artic minion via PHW's nextflow pipeline - this works
-    nextflow_command=(get_nextflow_command(basecalled_fastq, raw_fast5, sequencing_summary,nf_outdir,run_name))
-    run_command([listToString(nextflow_command)], shell=True)
+    #nextflow_command=(get_nextflow_command(basecalled_fastq, raw_fast5, sequencing_summary,nf_outdir,run_name))
+    #run_command([listToString(nextflow_command)], shell=True)
+    #consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
 
     ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
-    pangolin_command=(get_pangolin_command(consensus_dir,pangolin_outdir))
-    run_command([listToString(pangolin_command)], shell=True)
+    #pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir))
+    #run_command([listToString(pangolin_command)], shell=True)
 
     ##Nextclade lineage assignment and substitutions
-    #As input: consensus_dir
-    #nextclade_command=(get_nextclade_command(consensus_dir))
-    #run_command([listToString(nextclade_command)], shell=True)
-    #Make sure to pull image to download latest version
-    #sudo docker run -it --rm -u 1001 --volume="${PWD}:/seq" neherlab/nextclade nextclade --input-fasta '/seq/sequences.fasta' --output-csv '/seq/results.csv'
+    #nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir))
+    #run_command([combineCommand(nextclade_command)], shell=True)
     
     #QC: Generate report
+    qc_command=(generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_names))
+    #run_command([combineCommand(qc_command)], shell=True)
+   
     #with open(args.filename) as file:
 
 
