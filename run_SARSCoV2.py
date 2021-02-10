@@ -48,9 +48,17 @@ BARCODING = collections.OrderedDict([
     ('native_1-12',  ['--arrangements_files "barcode_arrs_nb12.cfg "']),
     ('native_13-24', ['--arrangements_files "barcode_arrs_nb24.cfg" ']),
     ('native_1-24',  ['--arrangements_files "barcode_arrs_nb12.cfg barcode_arrs_nb24.cfg" ']),
-    #('rapid_1-12',   ['--barcode_kits "SQK-RBK004" --trim_barcodes ']),
+    ('native_1-96',  ['--arrangements_files "barcode_arrs_nb96.cfg" ']),
+    #('rapid_1-12',   ['--barcode_kit "SQK-RBK004" --trim_barcodes ']),
     ('none',         [])
 ])
+
+
+###TODOs
+#Order defs logically (just for fun)
+#Add the FASTQ and FAST5 checks in one def , warning if 
+###
+
 
 #Definitions
 def parse_args():
@@ -66,34 +74,22 @@ def parse_args():
 
     #Input
     input_args.add_argument('-i', '--input_dir', type=pathlib.Path, required=True, help='Input directory, which should contain "fast5_pass" directory fast5-files.')
-    #input_args.add_argument('-f', '--input_fast5', type=pathlib.Path, required=True, help='Input directory, which will be recursively searched for fast5-files.')
-    #input_args.add_argument('-q', '--input_fastq', type=pathlib.Path, required=False, help='Input directory, which will be searched for fastq-files.')
-    input_args.add_argument('-b', '--basecalling_model', type=str, required=True, choices=["r9.4_fast","r9.4_hac","r10_fast","r10_hac"], help='Indicate which basecalling mode to use. In most cases you probably want to use a HAC option.')
-    input_args.add_argument('-k', '--barcode_kit', type=str, required=True, choices=["none","native_1-12","native_13-24","native_1-24"], help='Indicate which barcode-kits were used, if any.')
     input_args.add_argument('-s', '--sample_names', type=str, required=True, help='Provide a comma-separated list showing which barcode corresponds to which sample (for final report)')
-
+    
+    #Options to perform basecalling and/or demultiplexing before running artic guppyplex and minion
+    optional_args.add_argument('--basecall', action='store_true', required=False, help='Perform basecalling before running artic pipeline. Default: off.')
+    optional_args.add_argument('--demultiplex', action='store_true', required=False, help='Perform demultiplexing before running artic pipeline. Default: off.')
+    
+    #Only needed if args.basecalling
+    optional_args.add_argument('-b', '--basecalling_model', type=str, required=False, choices=["r9.4_fast","r9.4_hac","r10_fast","r10_hac"], help='Indicate which basecalling mode to use. In most cases you want to use a HAC option. This flag is required with --basecalling')
+    optional_args.add_argument('--resume_basecalling', action='store_true', required=False, help='This flag can be used with --basecalling to resume an interrupted basecalling run. Default: off.')
+    optional_args.add_argument('--cpu', action='store_true', required=False, help='This flag can be used with --basecalling to run on CPU instead of GPU. Will use 4 threads and 6 callers. Default: GPU -auto x.')
+    #Only needed if args.demultiplexing
+    optional_args.add_argument('-k', '--barcode_kit', type=str, required=False, choices=["none","native_1-12","native_13-24","native_1-24","native_1-96"], help='Indicate which barcode-kits were used, if any. This flag is required with --demultiplexing')
 
     #Output - currently writes to same dir as input
     #output_args.add_argument('-o', '--outdir', type=pathlib.Path, required=False, default='.', help='Output directory for all output files. Only specify if different to input directory.')
-
-    #Advanced options
-    optional_args.add_argument('--resume_basecalling', action='store_true', required=False, help='Use this flag if your first run was interrupted and you want to resume. Default: off.')
-    optional_args.add_argument('--cpu', action='store_true', required=False, help='If GPU is busy, use CPU with this flag. Will use 4 threads and 6 callers. Default: GPU.')
-    #advanced_args.add_argument('-d', '--input_demultiplexed', type=pathlib.Path, required=True, help='Input directory of demultiplexed FASTQ files. Note: It is important that this demultiplexing was performed with the command described in the Wiki.')
-
     return parser.parse_args()
-
-def listToString(s):  
-    # initialize an empty string 
-    str1 = " " 
-    # return string   
-    return (str1.join(s)) 
-
-def combineCommand(s):  
-    # initialize an empty string 
-    str2 = "" 
-    # return string   
-    return (str2.join(s)) 
 
 def run_command(command, **kwargs): #yekwahs
     command_str = ''.join(command)
@@ -107,6 +103,23 @@ def run_command(command, **kwargs): #yekwahs
         message = "Command '{}' failed with non-zero exit status: {}".format(command_str, exit_status)
         raise CommandError({"Error:": message})
 
+def listToString(s):  
+    # initialize an empty string 
+    str1 = " " 
+    # return string   
+    return (str1.join(s)) 
+
+def combineCommand(s):  
+    # initialize an empty string 
+    str2 = "" 
+    # return string   
+    return (str2.join(s)) 
+
+def fileCount(path, extension):
+    count = 0
+    for root, dirs, files in os.walk(path):
+        count += sum(f.endswith(extension) for f in files)
+    return count
 
 def check_python_version():
     try:
@@ -115,9 +128,9 @@ def check_python_version():
         sys.exit('Error: Python 3.5 or greater is required')
 
 #Only check if guppy_basecalling is being run
-#def check_guppy_version():
-#    run_command(['echo -n "guppy_basecaller \t" >> pipeline_versions.txt ; guppy_basecaller --version >> pipeline_versions.txt'], shell=True) ##Check for empty results, skip
-#    pass
+def check_guppy_version():
+   run_command(['echo -n "guppy_basecaller \t" >> pipeline_versions.txt ; guppy_basecaller --version >> pipeline_versions.txt'], shell=True) ##Check for empty results, skip
+   pass
 
 def check_nextflow_version():
     nextflow_version = run_command(['echo -n "nextflow \t" >> pipeline_versions.txt ; nextflow -version | grep version >> pipeline_versions.txt'], shell=True)     ##Check that version is correct
@@ -130,7 +143,7 @@ def check_nextflow_version():
         sys.exit('Error: Nextflow version 20.10.0 is required')
 
 def check_artic_version():
-    run_command(['echo -n "artic \t" >> pipeline_versions.txt ;~/Programs/conda_for_covid/artic-2c6f8ebeb615d37ee3372e543ec21891/bin/artic --version >> pipeline_versions.txt'], shell=True) ##Check for empty results, skip
+    run_command(['echo -n "artic \t" >> pipeline_versions.txt ;~/Programs/conda_for_covid/work/conda/artic-2c6f8ebeb615d37ee3372e543ec21891/bin/artic --version >> pipeline_versions.txt'], shell=True) ##Check for empty results, skip
     pass
 
 #TODO: def check_pangolin_version():
@@ -142,35 +155,49 @@ def check_artic_version():
 #    if not os.path.exists(os.path.join(os.getcwd(),fast5_pass)):
 #    pass
 
+def check_arguments(args):
+    model_choices = list(BASECALLING.keys())
+    barcode_choices = list(BARCODING.keys())
+    '''First check if basecalling is needed and if correct parameters are given'''
+    if args.basecall and (args.basecalling_model is None):
+        sys.exit('Error: Flag --basecalling_model must be specified with --basecall. --barcodes choices are: {}'.format(join_with_or(model_choices)))
+    if args.basecall and (args.basecalling_model):
+        args.basecalling_model = args.basecalling_model.lower()
+        check_guppy_version()
+        if args.basecalling_model not in model_choices:
+            sys.exit('Error: valid --model choices are: {}'.format(join_with_or(model_choices)))
 
-def fileCount(path, extension):
-    count = 0
-    for root, dirs, files in os.walk(path):
-        count += sum(f.endswith(extension) for f in files)
-    return count
+    if args.demultiplex and (args.barcode_kit is None):
+        sys.exit('Error: Flag --barcode_kit / -k must be specified with --basecall. --barcodes choices are: {}'.format(join_with_or(barcode_choices)))
+    if args.demultiplex and (args.barcode_kit):
+        args.barcode_kit = args.barcode_kit.lower()
+        check_guppy_version()
+        #check_fastq(args)
+        if args.barcode_kit not in barcode_choices:
+            sys.exit('Error: valid --barcodes choices are: {}'.format(join_with_or(barcode_choices)))
 
 def check_fast5(args): ##This can be done neater
-     #Check that the input dir exists
+    #Check that the input dir exists
     if not args.input_dir.is_dir():
         sys.exit('Error: {} is not a directory'.format(args.in_dir))
     #Check that the fast5_pass folder is present and count number of FAST5 files
     full_path = os.path.abspath(args.input_dir)
-    fast5_pass=(full_path+"/fast5_pass/")
+    fast5_pass=(full_path+"/fast5_pass/") 
     fast5_pass_alt=(full_path+"/001_fast5_pass/")
     if not os.path.exists(os.path.join(os.getcwd(),fast5_pass)):
         if os.path.exists(os.path.join(os.getcwd(),fast5_pass_alt)):
             len_fast5=fileCount(fast5_pass_alt, '.fast5')
             if len_fast5 != 0:
-                print("Found directory 001_fast5_pass with " + str(len_fast5) + " .fast5 files to analyse")
+                print("Found directory ./001_fast5_pass/ with " + str(len_fast5) + " .fast5 files to analyse")
                 raw_fast5s=fast5_pass_alt
             else:
-                sys.exit('Error: Found no .fast5 files')
+                sys.exit('Error: Found no .fast5 files. Please check that your input directory is correct.')
         else:
             sys.exit('Error: {} is not a directory'.format(fast5_pass))
     if os.path.exists(os.path.join(os.getcwd(),fast5_pass)):
         len_fast5=fileCount(fast5_pass, '.fast5')
         if len_fast5 != 0:
-            print("Found directory fast5_pass with " + str(len_fast5) + " .fast5 files to analyse")
+            print("Found directory ./fast5_pass/ with " + str(len_fast5) + " .fast5 files to analyse")
             raw_fast5s=fast5_pass
         else:
             sys.exit('Error: Found no .fast5 files')
@@ -184,9 +211,8 @@ def check_fastq(args): ##This can be done neater
     fastq_pass_alt=(full_path+"/002_basecalled/")
     fastq_pass_alt_2=(full_path+"/003_demultiplexed/")
     if os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
-        print("Found fastq_pass folder. Checking for demultiplexed files (split into barcodes)")
-        #TODO: ADD check for barcodes (nextflow pipeline can handle this)
-        sequencing_summary=(full_path+"/sequencing_summary*.txt")  #split run name to the last two "_"s to get this name properly
+        print("Found fastq_pass folder.")
+        sequencing_summary=(full_path+"/sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
         basecalled_fastq=fastq_pass
     if not os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
         if os.path.exists(os.path.join(os.getcwd(),fastq_pass_alt)):
@@ -197,34 +223,29 @@ def check_fastq(args): ##This can be done neater
             if not os.path.exists(os.path.join(os.getcwd(),fastq_pass_alt_2)):
                 basecalled_fastq=fastq_pass_alt
         else:
-            print("No fastq_pass folder found. Will perform guppy basecalling and demultiplexing")
-            basecalled_fastq=(full_path+'/002_basecalled/')
-            sequencing_summary=(full_path+'/002_basecalled/sequencing_summary.txt')
+            if args.demultiplex:
+                print("No fastq_pass folder found. Will perform demultiplexing and store results in ./003_demultiplexed/")
+                basecalled_fastq=(full_path+'/002_basecalled/')
+                sequencing_summary=(full_path+'/002_basecalled/sequencing_summary.txt')
+            if not args.demultiplex:
+                sys.exit("No fastq_pass folder found. Make sure the folder 'fastq_pass' or '002_demultiplexed' is in the input_folder, or specifiy --demultiplex to perform demultiplexing of basecalled fast5s." )
     len_fastq=fileCount(basecalled_fastq, '.fastq')
     if len_fastq != 0:
         print("Found directory fastq_pass with " + str(len_fastq) + " .fastq files to analyse")
 
     return basecalled_fastq, sequencing_summary
 
+def join_with_or(str_list):
+    if isinstance(str_list, dict):
+        str_list = list(str_list.keys())
+    if len(str_list) == 0:
+        return ''
+    if len(str_list) == 1:
+        return str_list[0]
+    return ', '.join(str_list[:-1]) + ' or ' + str_list[-1]
 
-def check_arguments(args):
-    '''Check that the arguments are satisfied.'''
-    barcode_choices = list(BARCODING.keys())
-    args.barcode_kit = args.barcode_kit.lower()
-    if args.barcode_kit not in barcode_choices:
-        sys.exit('Error: valid --barcodes choices are: {}'.format(join_with_or(barcode_choices)))
-
-    model_choices = list(BASECALLING.keys())
-    args.basecalling_model = args.basecalling_model.lower()
-    if args.basecalling_model not in model_choices:
-        sys.exit('Error: valid --model choices are: {}'.format(join_with_or(model_choices)))
-
-
-
-    #TODO: Check if Nextflow has already been run (007_nextflow + "nextflowSucess.txt")
-
+    #TODO: Check if Nextflow has already been run (007_nextflow + "nextflowSucess.txt") and you only want to generate report
     #TODO:Check barcode - sample doc
-
     #TODO: Add check for outdir if different than input dir
 
 
@@ -266,7 +287,7 @@ def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_
     #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --prefix 20210202_1359_X5_FAO88697_5cf6e6f0  --cache /home/marit/Programs/conda_for_covid/work/conda --basecalled_fastq ./fastq_pass --fast5_pass  ./fast5_pass/ --sequencing_summary sequencing_summary_FAO88697_f6a6d889.txt --outdir 007_nextflow
     #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --cache /home/marit/Programs/conda_for_covid/work/conda --prefix 210124_FAO88582_CoV_NB1-24   --basecalled_fastq ./003_demultiplexed --fast5_pass ./001_raw_fast5s/fast5_pass/new_copy     # --sequencing_summary ./002_basecalled/sequencing_summary.txt --outdir test_nextflow
     #TODO: add option to specify run folder, cache and medaka options
-    nextflow_command = ['nextflow run ~/Programs/ncov2019-artic-nf -profile conda --nanopolish --cache /home/marit/Programs/conda_for_covid/work/conda ',
+    nextflow_command = ['nextflow run ~/Programs/ncov2019-artic-nf -profile conda --nanopolish --cache ~/Programs/conda_for_covid/work/conda ',
                      '--prefix', run_name, 
                      '--basecalled_fastq', demultiplexed_fastq, 
                      '--fast5_pass', fast5_pass,
@@ -344,16 +365,21 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     nclade_df  = nclade_df.rename(columns={'seqName': 'barcode'})
     pangolin_df = pangolin_df.rename(columns={'taxon': 'barcode'})
 
-    #Get uniform "barcode" column for each of the dataframes. Format: run_name+barcode_number
+    #Get uniform "barcode" column for each of the dataframes so they can be merged. Format: run_name+barcode_number
     nclade_df[['run_barcode', 'temp','temp2']] = nclade_df['barcode'].str.split('/', 2, expand=True)
     nclade_df_RB = pd.DataFrame([x.rsplit('_', 1) for x in nclade_df.run_barcode.tolist()], columns=['run', 'barcode'])
     print(nclade_df_RB)
 
+    #Create new dataframe with key information
+
+    #Merge the new dataframe and the three original dataframes
     # #Merge dataframe
     # data_frames = [sample_df, pangolin_df, artic_df, nclade_df]
     # df_merged = reduce(lambda  left,right: pd.merge(left,right,on=['barcode'], how='outer'), data_frames)
-    # #Save to CSV
-    # pd.DataFrame.to_csv(df_merged, 'merged.txt', sep=',', na_rep='.', index=False)
+
+    #Write to file
+    final_report_name=(run_name+'_report.txt')
+    # pd.DataFrame.to_csv(df_final_report, final_report_name, sep=',', na_rep='.', index=False)    
     # ##ATODO:DD run name to each line. Add versions to each line also?
     #TODO: ADD other versions?
 
@@ -402,38 +428,40 @@ def main():
     nextclade_outfile=(outdir+'007_nextclade/'+run_name+'_sequences.fasta_nextclade.csv')
     pangolin_outfile=(outdir+'006_pangolin/lineage_report.csv')
     artic_qc=(outdir+'004_artic_minion/'+run_name+'.qc.csv')
-    sample_names=(outdir+'sample_names.csv') #must check that it is correct format
-
-    #Check that fast5_pass directory is present in input_dir:
-
-    #TODO: Check if basecalling or basecalling+demultiplexing has been doneor not:
-
-
-
-    #Check if it was done on GridION/miniT (i.e. fastq_pass/)
-
-    #Check if it was done on Linux (i.e. 002_basecalled)
-
-   #Specify barcode kits and basecaller mode
-    barcode_kit=args.barcode_kit
-    basecaller_mode=args.basecalling_model
+    sample_names=(args.sample_names) #TODO: Must check that file exists and has correct header
 
     logging.info("##########CHECKPOINT##########")
     #Check necessary arguments, set variables and set up output directory
     check_python_version()
-    #check_guppy_version()
+    check_guppy_version()
     check_nextflow_version()
     check_artic_version()
     #TODO: # check_ncov2019_nextflow_exists() #check only if not default
 
+
     ##Check with user that they are happy with the input for the pipeline
     print("Please check that the specified input below is correct for your run: ")
+    #Specify barcode kits and basecaller mode (TODO integrate with def?)
+    print("FAST5 files are placed in: ")
+    if args.basecall and not args.demultiplex:
+        basecaller_mode=args.basecalling_model
+        print("Using basecaller mode: " + basecaller_mode)
+        print("")
+    else:
+        print("Basecalled files are placed in: ")
+    if args.demultiplex:
+        barcode_kit=args.barcode_kit
+        print("Specified barcode kit is: " + barcode_kit)
+    else:
+        print("Basecalled and demultiplexed FASTQ files are placed in: ")
+
+
     check_arguments(args)
     print("The input folder is: " + full_path)
     print("The name of your run is: " + run_name)
     print("Your barcodes are specified in: " + sample_names)
-    print("Specified barcode kit is: " + barcode_kit)
-    print("Using basecaller mode: " + basecaller_mode)
+
+
     while True:
         if(yes_or_no('Would you like to run this pipeline? y/n: ')):
             break
@@ -441,28 +469,28 @@ def main():
 
     ##Guppy basecalling
     #TODO: add check if basecalling has already been performed
-    #if not args.basecalled:
-    #Run basecalling
-    #basecalling_command=(get_guppy_basecalling_command(raw_fast5, basecalled_fastq, basecaller_mode, args.resume_basecalling, args.cpu))
-    #run_command([listToString(basecalling_command)], shell=True)
+    if args.basecall:
+        #Run basecalling
+        basecalling_command=(get_guppy_basecalling_command(raw_fast5, basecalled_fastq, basecaller_mode, args.resume_basecalling, args.cpu))
+        run_command([listToString(basecalling_command)], shell=True)
     
-    #if not args.demultiplexed:
-    ##Guppy demultiplexing
-    #demultiplexing_command=(get_guppy_barcoder_command(basecalled_fastq, demultiplexed_fastq, barcode_kit))
-    #run_command([listToString(demultiplexing_command)], shell=True)
+    if args.demultiplex:
+        ##Guppy demultiplexing
+        demultiplexing_command=(get_guppy_barcoder_command(basecalled_fastq, demultiplexed_fastq, barcode_kit))
+        run_command([listToString(demultiplexing_command)], shell=True)
 
     ##Run artic guppyplex and artic minion via PHW's nextflow pipeline - this works
-    #nextflow_command=(get_nextflow_command(basecalled_fastq, raw_fast5, sequencing_summary,nf_outdir,run_name))
-    #run_command([listToString(nextflow_command)], shell=True)
-    #consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
+    nextflow_command=(get_nextflow_command(basecalled_fastq, raw_fast5, sequencing_summary,nf_outdir,run_name))
+    run_command([listToString(nextflow_command)], shell=True)
+    consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
 
     ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
-    #pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir))
-    #run_command([listToString(pangolin_command)], shell=True)
+    pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir))
+    run_command([listToString(pangolin_command)], shell=True)
 
     ##Nextclade lineage assignment and substitutions
-    #nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir))
-    #run_command([combineCommand(nextclade_command)], shell=True)
+    nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir))
+    run_command([combineCommand(nextclade_command)], shell=True)
     
     #QC: Generate report
     qc_command=(generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_names))
@@ -474,3 +502,7 @@ def main():
 if __name__ == '__main__':
     main()
 #EOF
+
+
+##TODO:
+# Add barkode kits and basecalling model to def and only return/include if it exists.
