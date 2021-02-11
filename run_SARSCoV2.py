@@ -74,12 +74,14 @@ def parse_args():
 
     #Input
     input_args.add_argument('-i', '--input_dir', type=pathlib.Path, required=True, help='Input directory, which should contain "fast5_pass" directory fast5-files.')
-    input_args.add_argument('-s', '--sample_names', type=str, required=True, help='Provide a comma-separated list showing which barcode corresponds to which sample (for final report)')
+    input_args.add_argument('-s', '--sample_names', type=pathlib.Path, required=True, help='Provide a comma-separated list showing which barcode corresponds to which sample (for final report)')
     
     #Options to perform basecalling and/or demultiplexing before running artic guppyplex and minion
     optional_args.add_argument('--basecall', action='store_true', required=False, help='Perform basecalling before running artic pipeline. Default: off.')
     optional_args.add_argument('--demultiplex', action='store_true', required=False, help='Perform demultiplexing before running artic pipeline. Default: off.')
-    
+    optional_args.add_argument('--generate_report_only', action='store_true', required=False, help='Do not run any tools, just (re)generate output report. Default: off.')
+
+
     #Only needed if args.basecalling
     optional_args.add_argument('-b', '--basecalling_model', type=str, required=False, choices=["r9.4_fast","r9.4_hac","r10_fast","r10_hac"], help='Indicate which basecalling mode to use. In most cases you want to use a HAC option. This flag is required with --basecalling')
     optional_args.add_argument('--resume_basecalling', action='store_true', required=False, help='This flag can be used with --basecalling to resume an interrupted basecalling run. Default: off.')
@@ -284,8 +286,8 @@ def get_guppy_barcoder_command(input_dir, save_dir, barcode_kit):
     return barcoding_command
 
 def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_outdir,run_name):
-    #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --prefix 20210202_1359_X5_FAO88697_5cf6e6f0  --cache /home/marit/Programs/conda_for_covid/work/conda --basecalled_fastq ./fastq_pass --fast5_pass  ./fast5_pass/ --sequencing_summary sequencing_summary_FAO88697_f6a6d889.txt --outdir 007_nextflow
-    #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --cache /home/marit/Programs/conda_for_covid/work/conda --prefix 210124_FAO88582_CoV_NB1-24   --basecalled_fastq ./003_demultiplexed --fast5_pass ./001_raw_fast5s/fast5_pass/new_copy     # --sequencing_summary ./002_basecalled/sequencing_summary.txt --outdir test_nextflow
+    #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --prefix 20210202_1359_X5_FAO88697_5cf6e6f0  --cache ~/Programs/conda_for_covid/work/conda --basecalled_fastq ./fastq_pass --fast5_pass  ./fast5_pass/ --sequencing_summary sequencing_summary_FAO88697_f6a6d889.txt --outdir 007_nextflow
+    #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --cache ~/Programs/conda_for_covid/work/conda --prefix 210124_FAO88582_CoV_NB1-24   --basecalled_fastq ./003_demultiplexed --fast5_pass ./001_raw_fast5s/fast5_pass/new_copy     # --sequencing_summary ./002_basecalled/sequencing_summary.txt --outdir test_nextflow
     #TODO: add option to specify run folder, cache and medaka options
     nextflow_command = ['nextflow run ~/Programs/ncov2019-artic-nf -profile conda --nanopolish --cache ~/Programs/conda_for_covid/work/conda ',
                      '--prefix', run_name, 
@@ -299,9 +301,10 @@ def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_
 
 def get_pangolin_command(consensus_file,pangolin_outdir):
     #conda update pangolin?
-    #conda activate pangolin; pangolin file --outfile outfile ; pangolin deactivate
+    #conda activate pangolin; pangolin --update ; pangolin file --outfile outfile ; pangolin deactivate
     #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --cache /home/marit/Programs/conda_for_covid/work/conda --prefix 210124_FAO88582_CoV_NB1-24   --basecalled_fastq ./003_demultiplexed --fast5_pass ./001_raw_fast5s/fast5_pass/new_copy     # --sequencing_summary ./002_basecalled/sequencing_summary.txt --outdir test_nextflow
     pangolin_command = ['bash -c "source activate pangolin ; ',
+                        #'pangolin --update ',
                         'pangolin ', consensus_file,
                         '--outdir ', pangolin_outdir,
                         '--threads 20 "']
@@ -348,44 +351,80 @@ def copy_to_consensus(consensus_dir, artic_outdir, run_name):
     return consensus_file
 
 def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_names):
-    print("Run: " +run_name)
+    print("Found the following files to generate a report from: ")
+    print("Run name: " +run_name)
     print("Nextclade file: "+nextclade_outfile)
     print("Pangolin file: "+pangolin_outfile)
     print("Artic QC file: "+artic_qc)
-    print("Sample names: "+sample_names) #ignore if header
+    print("Sample names: "+sample_names) #TODO:ignore if header ##TODO: Get full path
+
+    # #Check correct format
+    # with open(sample_names, 'r') as f:
+    #     print f.readline()
 
     #Read in files to dataframes
     artic_df = pd.read_csv(artic_qc, sep=',', header=0, encoding='utf8', engine='python')
     nclade_df = pd.read_csv(nextclade_outfile, sep=';', header=0, encoding='utf8', engine='python')
     pangolin_df = pd.read_csv(pangolin_outfile, sep=',', header=0, encoding='utf8', engine='python')
     sample_df = pd.read_csv(sample_names, sep=',', header=0, encoding='utf8', engine='python')
-    
-    #Make sure all have colname "barcode" for merging
-    artic_df  = artic_df.rename(columns={'sample_name': 'barcode'})
-    nclade_df  = nclade_df.rename(columns={'seqName': 'barcode'})
-    pangolin_df = pangolin_df.rename(columns={'taxon': 'barcode'})
 
-    #Get uniform "barcode" column for each of the dataframes so they can be merged. Format: run_name+barcode_number
-    nclade_df[['run_barcode', 'temp','temp2']] = nclade_df['barcode'].str.split('/', 2, expand=True)
-    nclade_df_RB = pd.DataFrame([x.rsplit('_', 1) for x in nclade_df.run_barcode.tolist()], columns=['run', 'barcode'])
-    print(nclade_df_RB)
+    #TODO: Check that sample_df has header!!
+    #If sample_df has "NB[0-9][0-9]" or "Barcode[0-9][0-9]" format, change to "barcode[0-9][0-9]" format
+    sample_df['barcode']=sample_df['barcode'].str.replace('NB', 'barcode')
+    sample_df['barcode']=sample_df['barcode'].str.replace('Barcode', 'barcode')
+
+    artic_df['run_barcode'] = artic_df.loc[:, 'sample_name']
+    nclade_df['run_barcode_artic_nanop'] = nclade_df.loc[:, 'seqName']
+    pangolin_df['run_barcode_artic_nanop'] = pangolin_df.loc[:, 'taxon']
+
+    #Get uniform "barcode" and "run" column for each of the dataframes so they can be merged.
+    artic_df[['run', 'barcode']] = artic_df['run_barcode'].str.split('_', 2, expand=True) 
+    nclade_df[['run_barcode', 'ARTIC','nanopolish']] = nclade_df['run_barcode_artic_nanop'].str.split('/', 3, expand=True)
+    nclade_df[['run', 'barcode']] = nclade_df['run_barcode'].str.split('_', 2, expand=True)
+    pangolin_df[['run_barcode', 'ARTIC','nanopolish']] = pangolin_df['run_barcode_artic_nanop'].str.split('/', 3, expand=True)
+    pangolin_df[['run', 'barcode']] = pangolin_df['run_barcode'].str.split('_', 2, expand=True)
+
+    #Merge dataframes
+    data_frames = [sample_df, artic_df, pangolin_df, nclade_df]
+    df_merged = reduce(lambda  left,right: pd.merge(left,right,on=['barcode'], how='outer'), data_frames)
 
     #Create new dataframe with key information
+    #From the merged dataframes, take the information you want to be first (rename some of tjen)
+    df_main_results = df_merged[['sample_name_x','run_x','barcode','qc_pass','lineage','clade','totalGaps','totalInsertions','totalMissing','totalMutations','totalNonACGTNs','totalPcrPrimerChanges','substitutions','deletions','insertions','missing','nonACGTNs','pcrPrimerChanges','aaSubstitutions','totalAminoacidSubstitutions','aaDeletions','totalAminoacidDeletions','alignmentEnd']]
+    #Extract what you want from the three dataframes and merge as one
 
     #Merge the new dataframe and the three original dataframes
-    # #Merge dataframe
-    # data_frames = [sample_df, pangolin_df, artic_df, nclade_df]
-    # df_merged = reduce(lambda  left,right: pd.merge(left,right,on=['barcode'], how='outer'), data_frames)
+    final_data_frames = [df_main_results, df_merged]
+    df_final_report = reduce(lambda  left,right: pd.merge(left,right,on=['sample_name_x'], how='outer'), final_data_frames)
+    #Deselect unneccessary columns
+    df_final_report = df_final_report.drop(['run_barcode_artic_nanop_y','run_barcode','ARTIC_y','nanopolish_y','run','run_barcode_artic_nanop_x','run_barcode_y','ARTIC_x','nanopolish_x','run_y','run_barcode_x','run_x_y','barcode_y'], axis=1)
+    df_final_report.insert(17, 'artic_QC', 'artic_QC')
+    df_final_report.insert(26, 'pangolin_report', 'pangolin_report')
+    df_final_report.insert(34, 'nextclade_report', 'nextclade_report')
 
-    #Write to file
+    df_final_report.rename({'sample_name_x': 'Sample_name', 'run_x_x': 'Run', 'barcode_x': 'Barcode', 'qc_pass_x': 'QC_pass', 'lineage_x': 'pangolin_lineage', 'clade_x': 'nextstrain_clade'}, axis=1, inplace=True)
+
+    #Write to outputfile
     final_report_name=(run_name+'_report.txt')
-    # pd.DataFrame.to_csv(df_final_report, final_report_name, sep=',', na_rep='.', index=False)    
-    # ##ATODO:DD run name to each line. Add versions to each line also?
-    #TODO: ADD other versions?
+    pd.DataFrame.to_csv(df_final_report, final_report_name, sep=',', na_rep='.', index=False)    
+
+def get_sample_names(args):
+    if not args.sample_names.is_file():
+        sys.exit('Error: {} is not a file. Please check your input.'.format(args.sample_names))
+    if args.sample_names.is_file():
+        sample_names=str(args.sample_names) #TODO: Must check that file exists and has correct header
+        print("Your barcodes are specified in: " + sample_names)
+    
+    #TODO: Check that it is the correct format
+    return sample_names
+
 
 #main
 def main():    
     args = parse_args()
+    start_time = time.time()
+    now = datetime.datetime.now()    
+    todays_date = now.strftime('%Y-%m-%d_%H-%M-%S')
 
     ## Set up log to stdout
     logfile= None
@@ -428,7 +467,7 @@ def main():
     nextclade_outfile=(outdir+'007_nextclade/'+run_name+'_sequences.fasta_nextclade.csv')
     pangolin_outfile=(outdir+'006_pangolin/lineage_report.csv')
     artic_qc=(outdir+'004_artic_minion/'+run_name+'.qc.csv')
-    sample_names=(args.sample_names) #TODO: Must check that file exists and has correct header
+    
 
     logging.info("##########CHECKPOINT##########")
     #Check necessary arguments, set variables and set up output directory
@@ -455,17 +494,15 @@ def main():
     else:
         print("Basecalled and demultiplexed FASTQ files are placed in: ")
 
-
     check_arguments(args)
     print("The input folder is: " + full_path)
     print("The name of your run is: " + run_name)
-    print("Your barcodes are specified in: " + sample_names)
+    sample_names=get_sample_names(args)
 
-
+    #Check with user that input is correct before proceeding. Can be skipped with 'yes |' in beginning of command
     while True:
         if(yes_or_no('Would you like to run this pipeline? y/n: ')):
             break
-    ##ADD start and end time of run
 
     ##Guppy basecalling
     #TODO: add check if basecalling has already been performed
@@ -479,25 +516,30 @@ def main():
         demultiplexing_command=(get_guppy_barcoder_command(basecalled_fastq, demultiplexed_fastq, barcode_kit))
         run_command([listToString(demultiplexing_command)], shell=True)
 
-    ##Run artic guppyplex and artic minion via PHW's nextflow pipeline - this works
-    nextflow_command=(get_nextflow_command(basecalled_fastq, raw_fast5, sequencing_summary,nf_outdir,run_name))
-    run_command([listToString(nextflow_command)], shell=True)
-    consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
+    if not args.generate_report_only:
+        ##Run artic guppyplex and artic minion via PHW's nextflow pipeline - this works
+        nextflow_command=(get_nextflow_command(basecalled_fastq, raw_fast5, sequencing_summary,nf_outdir,run_name))
+        run_command([listToString(nextflow_command)], shell=True)
+        consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
 
-    ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
-    pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir))
-    run_command([listToString(pangolin_command)], shell=True)
+        ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
+        pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir))
+        run_command([listToString(pangolin_command)], shell=True)
 
-    ##Nextclade lineage assignment and substitutions
-    nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir))
-    run_command([combineCommand(nextclade_command)], shell=True)
-    
+        ##Nextclade lineage assignment and substitutions
+        nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir))
+        run_command([combineCommand(nextclade_command)], shell=True)
+        
     #QC: Generate report
     qc_command=(generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_names))
     #run_command([combineCommand(qc_command)], shell=True)
    
     #with open(args.filename) as file:
 
+    #EOF
+    total_time = time.time() - start_time
+    time_mins = float(total_time) / 60
+    logging.info('Covid-genomics pipeline finished in ' + str(time_mins) + ' mins.')
 
 if __name__ == '__main__':
     main()
@@ -506,3 +548,6 @@ if __name__ == '__main__':
 
 ##TODO:
 # Add barkode kits and basecalling model to def and only return/include if it exists.
+
+##How to transfer files to P (and how the file structure should be)
+##Easier - how to transfer files from GridION to P
