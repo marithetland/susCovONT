@@ -27,14 +27,12 @@ from Bio import SeqIO
 import pathlib
 import collections
 import dateutil.parser
-import h5py
 import random
 import statistics
 import tempfile
 from subprocess import call
 from subprocess import check_output, CalledProcessError, STDOUT
-from configparser import ConfigParser
-
+import configparser
 
 #Options for basecalling and barcoding ##Borrowed from Ryan Wick's https://github.com/rrwick/MinION-desktop/blob/master/basecall.py
 BASECALLING = collections.OrderedDict([
@@ -79,6 +77,7 @@ def parse_args():
     optional_args.add_argument('--basecall', action='store_true', required=False, help='Perform basecalling before running artic pipeline. Default: off.')
     optional_args.add_argument('--demultiplex', action='store_true', required=False, help='Perform demultiplexing before running artic pipeline. Default: off.')
     optional_args.add_argument('--generate_report_only', action='store_true', required=False, help='Do not run any tools, just (re)generate output report. Default: off.')
+    optional_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions.fault: off.')
 
     #Only needed if args.basecalling
     optional_args.add_argument('-b', '--basecalling_model', type=str, required=False, choices=["r9.4_fast","r9.4_hac","r10_fast","r10_hac"], help='Indicate which basecalling mode to use. In most cases you want to use a HAC option. This flag is required with --basecalling')
@@ -278,36 +277,47 @@ def get_guppy_barcoder_command(input_dir, save_dir, barcode_kit):
     print(listToString(barcoding_command))
     return barcoding_command
 
-def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_outdir,run_name):
+def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location,schemeRepoURL,offline):
     #TODO: add option to specify run folder, cache and medaka options
-    nextflow_command = ['nextflow run ~/Programs/ncov2019-artic-nf -profile conda --nanopolish --cache ~/Programs/conda_for_covid/work/conda ',
+    logging.info('Running artic guppyplex and artic minion via nextflow pipeline with command: ')
+    nextflow_command = ['nextflow run', nf_dir_location,
+                     ' -profile conda --nanopolish --cache', conda_location,
                      '--prefix', run_name, 
                      '--basecalled_fastq', demultiplexed_fastq, 
                      '--fast5_pass', fast5_pass,
                      '--sequencing_summary  ', sequencing_summary,
                      '--outdir ', nf_outdir]
-    
+    if offline:
+        nextflow_command += ['--schemeRepoURL ', schemeRepoURL]  #add option for offline running
+    #nextflow_command +=['2>&1 artic_log.txt']
+
     print(listToString(nextflow_command))
     return nextflow_command
 
-def get_pangolin_command(consensus_file,pangolin_outdir):
-    pangolin_command = ['bash -c "source activate pangolin ; ',
-                        #'pangolin --update ',
-                        'pangolin ', consensus_file,
+def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
+    logging.info('Running pangolin with command: ')
+    pangolin_command = ['bash -c "source activate pangolin ; ',]
+    if not offline:
+        pangolin_command +=['pangolin --update ; ',] #This takes approx 4 minutes, so consider turning off.
+    pangolin_command += ['pangolin ', consensus_file,
                         '--outdir ', pangolin_outdir,
-                        '--threads 20 "']
-    
+                        '--threads ',number_CPUs,
+                        '&>> pangolin_log.txt "']
     print(listToString(pangolin_command))
     return pangolin_command
 
-def get_nextclade_command(run_name,consensus_dir,nextclade_outdir):
+def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,offline):
     consensus_base=(run_name+'_sequences.fasta')
     os.mkdir(nextclade_outdir) #TODO: ADD TRY
-    nextclade_command = ['docker pull neherlab/nextclade:latest ; ',
-                     'docker run -it --rm -u 1001 --volume="',consensus_dir, 
+    logging.info('Running nextclade with command: ')
+    nextclade_command = []
+    if not offline:
+        nextflow_command = ['docker pull neherlab/nextclade:latest ;']  #add option for offline running
+    nextclade_command += ['docker run -it --rm -u 1001 --volume="',consensus_dir, 
                      ':/seq"  neherlab/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
                      '\' --output-csv \'/seq/',consensus_base,'_nextclade.csv\' ; '
-                     'mv ',consensus_dir+consensus_base,'_nextclade.csv ',nextclade_outdir,'']
+                     'mv ',consensus_dir+consensus_base,'_nextclade.csv ',nextclade_outdir,
+                     '&>> nextclade_log.txt ']
     
     print(combineCommand(nextclade_command))
     return nextclade_command
@@ -342,7 +352,8 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     print("Nextclade file: "+nextclade_outfile)
     print("Pangolin file: "+pangolin_outfile)
     print("Artic QC file: "+artic_qc)
-    print("Sample names: "+sample_names) #TODO:ignore if header ##TODO: Get full path
+    sample_path = os.path.abspath(sample_names)
+    print("Sample names: "+sample_path) #TODO:ignore if header ##TODO: Get full path
 
     # #Check correct format
     # with open(sample_names, 'r') as f:
@@ -391,7 +402,7 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     df_final_report.rename({'sample_name_x': 'Sample_name', 'run_x_x': 'Run', 'barcode_x': 'Barcode', 'qc_pass_x': 'QC_status', 'lineage_x': 'pangolin_lineage', 'clade_x': 'nextstrain_clade', 'missing_x': 'missing_bases', 'totalMutations_x': 'TotalMutations', 'totalAminoacidSubstitutions_x': 'TotalAminoacidSubstitutions', 'totalInsertions_x': 'TotalInsertions', 'totalAminoacidDeletions_x': 'TotalAminoacidDeletions', 'substitutions_x': 'NtSubstitutions', 'aaSubstitutions_x': 'AaSubstitutions','insertions_x': 'NtInsertions', 'deletions_x': 'NtDeletions',  'aaDeletions_x': 'AaDeletions'}, axis=1, inplace=True)
 
     #Write to outputfile
-    final_report_name=(run_name+'_report.txt')
+    final_report_name=(run_name+'_report.csv')
     pd.DataFrame.to_csv(df_final_report, final_report_name, sep=',', na_rep='.', index=False)    
     print("Run report written to file: " + final_report_name)
 
@@ -400,7 +411,7 @@ def get_sample_names(args):
         sys.exit('Error: {} is not a file. Please check your input.'.format(args.sample_names))
     if args.sample_names.is_file():
         sample_names=str(args.sample_names) #TODO: Must check that file exists and has correct header
-        print("Your barcodes are specified in: " + sample_names)
+        print("Your barcodes are specified in: " + os.path.abspath(sample_names))
     
     #TODO: Check that it is the correct format
     return sample_names
@@ -436,6 +447,21 @@ def check_what_to_run(args):
 
     return full_path, run_name, outdir, nf_outdir, artic_outdir, consensus_dir, pangolin_outdir, nextclade_outdir, nextclade_outfile, pangolin_outfile, artic_qc
 
+
+def config_variables():
+    #Sort out variables from config file
+    config=configparser.ConfigParser()
+    config.read(os.path.join(os.path.dirname(__file__),'scripts','config.cfg'))
+    config.sections()
+    nf_dir_location=config['NF_LOCATION']['nf_location']
+    conda_location=config['CONDA_LOCATION']['conda_location']
+    number_CPUs=config['CPU']['cpus']
+    schemeRepoURL=config['OFFLINE']['schemeRepoURL']
+
+    #TODO: Add default values
+
+    return nf_dir_location, conda_location, number_CPUs, schemeRepoURL
+
 #main
 def main():    
     args = parse_args()
@@ -443,7 +469,9 @@ def main():
     now = datetime.datetime.now()    
     todays_date = now.strftime('%Y-%m-%d_%H-%M-%S')
 
-    # ####Sort out config file
+    nf_dir_location, conda_location, number_CPUs, schemeRepoURL = config_variables()
+
+    
     # #Read config.ini file
     # config_object = ConfigParser()
     # config_object.read("config.ini")
@@ -519,26 +547,23 @@ def main():
     
     #Artic guppyplex and artic minion via PHW's nextflow pipeline
     if not args.generate_report_only:
-        logging.info('Running artic guppyplex and artic minion')
-        nextflow_command=(get_nextflow_command(basecalled_fastq, raw_fast5, sequencing_summary,nf_outdir,run_name))
-        run_command([listToString(nextflow_command)], shell=True)
-        consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
+         nextflow_command=(get_nextflow_command(basecalled_fastq, raw_fast5, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
+         run_command([listToString(nextflow_command)], shell=True)
+         consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
 
     ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
     if not args.generate_report_only:
-        logging.info('Running pangolin')
-        pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir))
+        pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,args.offline))
         run_command([listToString(pangolin_command)], shell=True)
 
     ##Nextclade lineage assignment and substitutions
     if not args.generate_report_only: 
-        logging.info('Running nextclade')
-        nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir))
+        nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir,args.offline))
         run_command([combineCommand(nextclade_command)], shell=True)
         
     #Generate run report
     logging.info('Generating run report with QC, lineages and list of mutations')
-    qc_command=(generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_names))
+    qc_command=(generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,args.sample_names))
    
     #EOF
     total_time = time.time() - start_time
@@ -564,7 +589,7 @@ if __name__ == '__main__':
 #update.py
 #Update conda artic
 #Update ncov?
-#Update pangolin
-#Update docker nextclade
+
 
 ##LEgg til sjhekk for NK
+## Update CPU in ncov file
