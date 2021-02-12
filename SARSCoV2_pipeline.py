@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""# marit.hetland@outlook.com
-# github marithetland
-# February 2021
-# This script will basecall and demultiplex
-# fast5 files from an ONT sequencing run before
-# running the ARTIC minion pipeline via PHW's
-# Nextflow pipeline. 
-# Currently tested with versions
-# Guppy basecalling software: Version 4.2.2+effbafg
-# Nextflow v.20.10.0
-# Artic v1.2.1
-# ncov nextflow pipeline last updated 23.12.2020 (https://github.com/connor-lab/ncov2019-artic-nf)
+""" marit.hetland@outlook.com
+github marithetland, February 2021
+This script will basecall and demultiplex
+fast5 files from an ONT sequencing run before
+running the ARTIC minion pipeline via PHW's Nextflow pipeline. 
+Currently tested with versions
+Guppy basecalling software: Version 4.4.1
+Nextflow v.20.10.0
+Artic v1.2.1
+ncov nextflow pipeline last updated 23.12.2020 (https://github.com/connor-lab/ncov2019-artic-nf)
 """
 
 #import modules
@@ -35,8 +33,10 @@ import statistics
 import tempfile
 from subprocess import call
 from subprocess import check_output, CalledProcessError, STDOUT
+from configparser import ConfigParser
 
-#Options for basecalling and barcoding ##Borrowed from Ryan Wick's  https://github.com/rrwick/MinION-desktop/blob/master/basecall.py
+
+#Options for basecalling and barcoding ##Borrowed from Ryan Wick's https://github.com/rrwick/MinION-desktop/blob/master/basecall.py
 BASECALLING = collections.OrderedDict([
     ('r9.4_fast', ['--config dna_r9.4.1_450bps_fast.cfg ']), 
     ('r9.4_hac',  ['--config dna_r9.4.1_450bps_hac.cfg ']), #make default
@@ -54,11 +54,10 @@ BARCODING = collections.OrderedDict([
 ])
 
 
-###TODOs
+###TODO:s
 #Order defs logically (just for fun)
 #Add the FASTQ and FAST5 checks in one def , warning if 
 ###
-
 
 #Definitions
 def parse_args():
@@ -80,7 +79,6 @@ def parse_args():
     optional_args.add_argument('--basecall', action='store_true', required=False, help='Perform basecalling before running artic pipeline. Default: off.')
     optional_args.add_argument('--demultiplex', action='store_true', required=False, help='Perform demultiplexing before running artic pipeline. Default: off.')
     optional_args.add_argument('--generate_report_only', action='store_true', required=False, help='Do not run any tools, just (re)generate output report. Default: off.')
-
 
     #Only needed if args.basecalling
     optional_args.add_argument('-b', '--basecalling_model', type=str, required=False, choices=["r9.4_fast","r9.4_hac","r10_fast","r10_hac"], help='Indicate which basecalling mode to use. In most cases you want to use a HAC option. This flag is required with --basecalling')
@@ -252,9 +250,6 @@ def join_with_or(str_list):
 
 
 def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, resume, cpu):
-    #guppy_basecaller -c dna_r9.4.1_450bps_hac.cfg -i ../fast5_pass -s 002_basecalled -x auto -r 
-    #Example command: guppy_basecaller -c dna_r9.4.1_450bps_hac.cfg -i /path/to/reads -s run_name -x auto -r
-
     basecalling_command = ['guppy_basecaller ',
                      '--input_path ', input_dir, 
                      '--recursive ',
@@ -272,8 +267,6 @@ def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, resume
     return basecalling_command
 
 def get_guppy_barcoder_command(input_dir, save_dir, barcode_kit):
-    #Example command: guppy_barcoder --require_barcodes_both_ends -i run_name -s output_directory --arrangements_files "barcode_arrs_nb12.cfg barcode_arrs_nb24.cfg"
-
     barcoding_command = ['guppy_barcoder ',
                      '--require_barcodes_both_ends '
                      '--input_path ', input_dir, 
@@ -286,8 +279,6 @@ def get_guppy_barcoder_command(input_dir, save_dir, barcode_kit):
     return barcoding_command
 
 def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_outdir,run_name):
-    #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --prefix 20210202_1359_X5_FAO88697_5cf6e6f0  --cache ~/Programs/conda_for_covid/work/conda --basecalled_fastq ./fastq_pass --fast5_pass  ./fast5_pass/ --sequencing_summary sequencing_summary_FAO88697_f6a6d889.txt --outdir 007_nextflow
-    #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --cache ~/Programs/conda_for_covid/work/conda --prefix 210124_FAO88582_CoV_NB1-24   --basecalled_fastq ./003_demultiplexed --fast5_pass ./001_raw_fast5s/fast5_pass/new_copy     # --sequencing_summary ./002_basecalled/sequencing_summary.txt --outdir test_nextflow
     #TODO: add option to specify run folder, cache and medaka options
     nextflow_command = ['nextflow run ~/Programs/ncov2019-artic-nf -profile conda --nanopolish --cache ~/Programs/conda_for_covid/work/conda ',
                      '--prefix', run_name, 
@@ -300,9 +291,6 @@ def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_
     return nextflow_command
 
 def get_pangolin_command(consensus_file,pangolin_outdir):
-    #conda update pangolin?
-    #conda activate pangolin; pangolin --update ; pangolin file --outfile outfile ; pangolin deactivate
-    #nextflow run ~/Programs/ncov2019-artic-nf/ -profile conda --cache /home/marit/Programs/conda_for_covid/work/conda --prefix 210124_FAO88582_CoV_NB1-24   --basecalled_fastq ./003_demultiplexed --fast5_pass ./001_raw_fast5s/fast5_pass/new_copy     # --sequencing_summary ./002_basecalled/sequencing_summary.txt --outdir test_nextflow
     pangolin_command = ['bash -c "source activate pangolin ; ',
                         #'pangolin --update ',
                         'pangolin ', consensus_file,
@@ -313,8 +301,6 @@ def get_pangolin_command(consensus_file,pangolin_outdir):
     return pangolin_command
 
 def get_nextclade_command(run_name,consensus_dir,nextclade_outdir):
-    #docker pull neherlab/nextclade:latest
-    #docker run -it --rm -u 1001 --volume="${PWD}:/seq" neherlab/nextclade nextclade --input-fasta '/seq/TEST_new_script_sequences.fasta' --output-csv '/seq/results.csv'
     consensus_base=(run_name+'_sequences.fasta')
     os.mkdir(nextclade_outdir) #TODO: ADD TRY
     nextclade_command = ['docker pull neherlab/nextclade:latest ; ',
@@ -378,11 +364,11 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     pangolin_df['run_barcode_artic_nanop'] = pangolin_df.loc[:, 'taxon']
 
     #Get uniform "barcode" and "run" column for each of the dataframes so they can be merged.
-    artic_df[['run', 'barcode']] = artic_df['run_barcode'].str.split('_', 2, expand=True) 
+    artic_df[['run', 'barcode']] =  artic_df.run_barcode.str.rsplit('_', 1, expand=True).rename(lambda x: f'col{x + 1}', axis=1)
     nclade_df[['run_barcode', 'ARTIC','nanopolish']] = nclade_df['run_barcode_artic_nanop'].str.split('/', 3, expand=True)
-    nclade_df[['run', 'barcode']] = nclade_df['run_barcode'].str.split('_', 2, expand=True)
+    nclade_df[['run', 'barcode']] =  nclade_df.run_barcode.str.rsplit('_', 1, expand=True).rename(lambda x: f'col{x + 1}', axis=1)
     pangolin_df[['run_barcode', 'ARTIC','nanopolish']] = pangolin_df['run_barcode_artic_nanop'].str.split('/', 3, expand=True)
-    pangolin_df[['run', 'barcode']] = pangolin_df['run_barcode'].str.split('_', 2, expand=True)
+    pangolin_df[['run', 'barcode']] =  pangolin_df.run_barcode.str.rsplit('_', 1, expand=True).rename(lambda x: f'col{x + 1}', axis=1)
 
     #Merge dataframes
     data_frames = [sample_df, artic_df, pangolin_df, nclade_df]
@@ -390,7 +376,7 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
 
     #Create new dataframe with key information
     #From the merged dataframes, take the information you want to be first (rename some of tjen)
-    df_main_results = df_merged[['sample_name_x','run_x','barcode','qc_pass','lineage','clade','totalGaps','totalInsertions','totalMissing','totalMutations','totalNonACGTNs','totalPcrPrimerChanges','substitutions','deletions','insertions','missing','nonACGTNs','pcrPrimerChanges','aaSubstitutions','totalAminoacidSubstitutions','aaDeletions','totalAminoacidDeletions','alignmentEnd']]
+    df_main_results = df_merged[['sample_name_x','run_x','barcode','qc_pass','lineage','clade','missing','totalMutations','totalAminoacidSubstitutions','totalInsertions','totalAminoacidDeletions','substitutions','aaSubstitutions','insertions','deletions','aaDeletions']]
     #Extract what you want from the three dataframes and merge as one
 
     #Merge the new dataframe and the three original dataframes
@@ -398,15 +384,16 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     df_final_report = reduce(lambda  left,right: pd.merge(left,right,on=['sample_name_x'], how='outer'), final_data_frames)
     #Deselect unneccessary columns
     df_final_report = df_final_report.drop(['run_barcode_artic_nanop_y','run_barcode','ARTIC_y','nanopolish_y','run','run_barcode_artic_nanop_x','run_barcode_y','ARTIC_x','nanopolish_x','run_y','run_barcode_x','run_x_y','barcode_y'], axis=1)
-    df_final_report.insert(17, 'artic_QC', 'artic_QC')
-    df_final_report.insert(26, 'pangolin_report', 'pangolin_report')
-    df_final_report.insert(34, 'nextclade_report', 'nextclade_report')
+    df_final_report.insert(17, 'artic_QC', 'artic_QC:')
+    df_final_report.insert(26, 'pangolin_report', 'pangolin_report:')
+    df_final_report.insert(34, 'nextclade_report', 'nextclade_report:')
 
-    df_final_report.rename({'sample_name_x': 'Sample_name', 'run_x_x': 'Run', 'barcode_x': 'Barcode', 'qc_pass_x': 'QC_pass', 'lineage_x': 'pangolin_lineage', 'clade_x': 'nextstrain_clade'}, axis=1, inplace=True)
+    df_final_report.rename({'sample_name_x': 'Sample_name', 'run_x_x': 'Run', 'barcode_x': 'Barcode', 'qc_pass_x': 'QC_status', 'lineage_x': 'pangolin_lineage', 'clade_x': 'nextstrain_clade', 'missing_x': 'missing_bases', 'totalMutations_x': 'TotalMutations', 'totalAminoacidSubstitutions_x': 'TotalAminoacidSubstitutions', 'totalInsertions_x': 'TotalInsertions', 'totalAminoacidDeletions_x': 'TotalAminoacidDeletions', 'substitutions_x': 'NtSubstitutions', 'aaSubstitutions_x': 'AaSubstitutions','insertions_x': 'NtInsertions', 'deletions_x': 'NtDeletions',  'aaDeletions_x': 'AaDeletions'}, axis=1, inplace=True)
 
     #Write to outputfile
     final_report_name=(run_name+'_report.txt')
     pd.DataFrame.to_csv(df_final_report, final_report_name, sep=',', na_rep='.', index=False)    
+    print("Run report written to file: " + final_report_name)
 
 def get_sample_names(args):
     if not args.sample_names.is_file():
@@ -418,6 +405,36 @@ def get_sample_names(args):
     #TODO: Check that it is the correct format
     return sample_names
 
+def check_what_to_run(args):
+
+    if args.input_dir:
+        full_path = os.path.abspath(args.input_dir)
+        run_name = os.path.basename(full_path) 
+        print("The input folder is: " + full_path)
+        print("The name of your run is: " + run_name)
+        outdir=full_path #TODO:Set optional (parental) outdir
+        if outdir[-1] != '/':
+            outdir = outdir + '/'
+
+        nf_outdir=(outdir+'004_artic_minion/')
+        artic_outdir=(outdir+'004_artic_minion/articNcovNanopore_sequenceAnalysisNanopolish_articMinIONNanopolish/')
+        consensus_dir=(outdir+'005_consensus_fasta/')
+        pangolin_outdir=(outdir+'006_pangolin/')
+        nextclade_outdir=(outdir+'007_nextclade/')
+        nextclade_outfile=(outdir+'007_nextclade/'+run_name+'_sequences.fasta_nextclade.csv')
+        pangolin_outfile=(outdir+'006_pangolin/lineage_report.csv')
+        artic_qc=(outdir+'004_artic_minion/'+run_name+'.qc.csv')
+
+    if args.basecall and not args.cpu:
+        print("Will perform basecalling of fast5 with default GPU")
+    if args.basecall and args.cpu:
+            print("Will perform basecalling of fast5 in CPU mode (default is GPU)")
+    if args.demultiplex:
+        print("Will perform demultiplexing of basecalled fast5.")
+    if args.generate_report_only:
+        print("Will generate final run report from already existing files, no programs will be run.")
+
+    return full_path, run_name, outdir, nf_outdir, artic_outdir, consensus_dir, pangolin_outdir, nextclade_outdir, nextclade_outfile, pangolin_outfile, artic_qc
 
 #main
 def main():    
@@ -426,57 +443,42 @@ def main():
     now = datetime.datetime.now()    
     todays_date = now.strftime('%Y-%m-%d_%H-%M-%S')
 
+    # ####Sort out config file
+    # #Read config.ini file
+    # config_object = ConfigParser()
+    # config_object.read("config.ini")
+
+    # #Get the password
+    # userinfo = config_object["USERINFO"]
+    # print("Password is {}".format(userinfo["password"]))
+    # ###
+
+
     ## Set up log to stdout
-    logfile= None
-    logging.basicConfig(
-        filename=logfile,
-        level=logging.DEBUG,
-        filemode='w',
-        format='%(asctime)s %(message)s',
-        datefmt='%m-%d-%Y %H:%M:%S')
-    logging.info('Running covid-genomics v.1.0.0')
-    logging.info('command line: {0}'.format(' '.join(sys.argv)))
+    logfile = None
+    logging.basicConfig(filename=logfile,level=logging.DEBUG,filemode='w',format='%(asctime)s %(message)s',datefmt='%m-%d-%Y %H:%M:%S')
+    logging.info('Running covid-genomics v.1.0.0') #Print program version
+    logging.info('command line: {0}'.format(' '.join(sys.argv))) #Print input command
+
+    #raw_fast5s=os.path.abspath(str(args.input_fast5))
+    #basecalled_fastq=(outdir+'002_basecalled/') #depends
+    #demultiplexed_fastq=(outdir+'003_demultiplexed/') #depends
+    #sequencing_summary=(outdir+'002_basecalled/'+'sequencing_summary.txt') #depends on how it was done
 
 
-    ##Control input arguments
-    full_path = os.path.abspath(args.input_dir) 
-    run_name = os.path.basename(full_path) 
-    
-    outdir=full_path #TODO:Set optional (parental) outdir
-    if outdir[-1] != '/':
-        outdir = outdir + '/'
-
-    
-    print("test")
+    logging.info("##########CHECKPOINT##########")
+    full_path, run_name, outdir, nf_outdir, artic_outdir, consensus_dir, pangolin_outdir, nextclade_outdir, nextclade_outfile, pangolin_outfile, artic_qc = check_what_to_run(args)
     raw_fast5=check_fast5(args)
     print(raw_fast5)
     basecalled_fastq,sequencing_summary=check_fastq(args)
     print(basecalled_fastq)
     print(sequencing_summary)
-    print("test end")
-
-    #raw_fast5s=os.path.abspath(str(args.input_fast5))
-    #basecalled_fastq=(outdir+'002_basecalled/') #depends
-    demultiplexed_fastq=(outdir+'003_demultiplexed/') #depends
-    #sequencing_summary=(outdir+'002_basecalled/'+'sequencing_summary.txt') #depends on how it was done
-    nf_outdir=(outdir+'004_artic_minion/')
-    artic_outdir=(outdir+'004_artic_minion/articNcovNanopore_sequenceAnalysisNanopolish_articMinIONNanopolish/')
-    consensus_dir=(outdir+'005_consensus_fasta/')
-    pangolin_outdir=(outdir+'006_pangolin/')
-    nextclade_outdir=(outdir+'007_nextclade/')
-    nextclade_outfile=(outdir+'007_nextclade/'+run_name+'_sequences.fasta_nextclade.csv')
-    pangolin_outfile=(outdir+'006_pangolin/lineage_report.csv')
-    artic_qc=(outdir+'004_artic_minion/'+run_name+'.qc.csv')
-    
-
-    logging.info("##########CHECKPOINT##########")
     #Check necessary arguments, set variables and set up output directory
     check_python_version()
     check_guppy_version()
     check_nextflow_version()
     check_artic_version()
     #TODO: # check_ncov2019_nextflow_exists() #check only if not default
-
 
     ##Check with user that they are happy with the input for the pipeline
     print("Please check that the specified input below is correct for your run: ")
@@ -507,35 +509,37 @@ def main():
     ##Guppy basecalling
     #TODO: add check if basecalling has already been performed
     if args.basecall:
-        #Run basecalling
         basecalling_command=(get_guppy_basecalling_command(raw_fast5, basecalled_fastq, basecaller_mode, args.resume_basecalling, args.cpu))
         run_command([listToString(basecalling_command)], shell=True)
     
+    ##Guppy demultiplexing
     if args.demultiplex:
-        ##Guppy demultiplexing
         demultiplexing_command=(get_guppy_barcoder_command(basecalled_fastq, demultiplexed_fastq, barcode_kit))
         run_command([listToString(demultiplexing_command)], shell=True)
-
+    
+    #Artic guppyplex and artic minion via PHW's nextflow pipeline
     if not args.generate_report_only:
-        ##Run artic guppyplex and artic minion via PHW's nextflow pipeline - this works
+        logging.info('Running artic guppyplex and artic minion')
         nextflow_command=(get_nextflow_command(basecalled_fastq, raw_fast5, sequencing_summary,nf_outdir,run_name))
         run_command([listToString(nextflow_command)], shell=True)
         consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
 
-        ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
+    ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
+    if not args.generate_report_only:
+        logging.info('Running pangolin')
         pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir))
         run_command([listToString(pangolin_command)], shell=True)
 
-        ##Nextclade lineage assignment and substitutions
+    ##Nextclade lineage assignment and substitutions
+    if not args.generate_report_only: 
+        logging.info('Running nextclade')
         nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir))
         run_command([combineCommand(nextclade_command)], shell=True)
         
-    #QC: Generate report
+    #Generate run report
+    logging.info('Generating run report with QC, lineages and list of mutations')
     qc_command=(generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_names))
-    #run_command([combineCommand(qc_command)], shell=True)
    
-    #with open(args.filename) as file:
-
     #EOF
     total_time = time.time() - start_time
     time_mins = float(total_time) / 60
@@ -543,11 +547,24 @@ def main():
 
 if __name__ == '__main__':
     main()
-#EOF
-
 
 ##TODO:
 # Add barkode kits and basecalling model to def and only return/include if it exists.
 
 ##How to transfer files to P (and how the file structure should be)
 ##Easier - how to transfer files from GridION to P
+## Note: Add own version of qc.py to run?
+
+##Offline mode?
+
+##Config file:
+# Placement of ncov_2019 thingy
+# 
+
+#update.py
+#Update conda artic
+#Update ncov?
+#Update pangolin
+#Update docker nextclade
+
+##LEgg til sjhekk for NK
