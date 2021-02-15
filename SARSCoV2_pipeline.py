@@ -248,8 +248,10 @@ def check_arguments(args):
         pipeline_commmand += ['\n- run basecalling with model', basecalling_model] 
     if args.barcode_kit:
         pipeline_commmand += ['\n- run demultiplexing with barcodes ', barcode_kit] 
-    if not args.basecalling_model and not args.barcode_kit:
-        pipeline_commmand += ['\n- run the artic pipeline, pangolin and nextclade ', barcode_kit] 
+    if not args.no_artic:
+        pipeline_commmand += ['\n- run the artic pipeline, pangolin and nextclade '] 
+    if args.no_artic:
+        pipeline_commmand += ['\n- run pangolin and nextclade on already completed artic run '] #TODO add check for existing run
     if args.generate_report_only:
         pipeline_commmand += ['\n- only (re)create output report from already completed pipeline run'] 
     if args.offline:
@@ -307,11 +309,11 @@ def check_input(args): #TODO: This can be done neater
     ''' Unless basecalling or demultiplexing is being performed, FASTQ files
     must be present for the pipeline to run '''
     #Check if the fastq_pass folder is present
-    fastq_pass=(full_path+"/fastq_pass/")
+    fastq_pass=(full_path+"/fastq_pass")
     fastq_pass_alt=(full_path+"/001_rawData/fastq_pass")
     fastq_pass_dem=(full_path+"/001_rawData/fastq_pass_demultiplexed")
     
-    ##IF not demultiplexing:
+    ##IF not demultiplexing or basecalling:
     if not args.barcode_kit and not args.basecalling_model:
         #The fastq_pass folder must exist as we are running nextflow directly on this + fast5.
         if os.path.exists(os.path.join(os.getcwd(),fastq_pass_dem)):
@@ -322,17 +324,27 @@ def check_input(args): #TODO: This can be done neater
             elif os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
                 sequencing_summary=(full_path+"/sequencing_summary*.txt") 
                 fastq_pass_path=fastq_pass
+                fastq_pass_dem_path=fastq_pass
             else:
                 sys.exit('Error: Could not find sequencing_summary.txt file to match ' + fastq_pass_dem)
         elif os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
             #If already basecalled and demultiplexed on the GridION/MinIT:
-            fastq_pass_dem_path=fastq_pass_dem
+            fastq_pass_path=fastq_pass
+            fastq_pass_dem_path=fastq_pass
             sequencing_summary=(full_path+"/sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
     ##IF demultiplexing
     if args.barcode_kit:
         #Check that there isn't already a folder called fastq_pass_demultiplexed
         if os.path.exists(os.path.join(os.getcwd(),fastq_pass_dem)):
             sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform demultiplexing.'.format(str(fastq_pass_dem)))
+    ##IF basecalling and demultiplexing
+    if args.barcode_kit and  args.basecalling_model:
+        if os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
+            sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass)))
+        if not os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
+            fastq_pass_path=fastq_pass_alt
+            fastq_pass_dem_path=fastq_pass_dem
+            sequencing_summary=(fastq_pass_alt+"/sequencing_summary.txt") 
     ##IF demultiplexing but NOT basecalling
     if args.barcode_kit and not args.basecalling_model:
         #If basecalling not specified, then the basecalled fastq folder must already exist
@@ -345,7 +357,7 @@ def check_input(args): #TODO: This can be done neater
             sequencing_summary=(full_path+"/sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
         else:
             sys.exit("Did not find a fastq_pass folder in {}/fastq_pass or {}/001_rawData/fastq_pass. Have you basecalled your fast5s or did you forget to specify basecalling (--basecalling_model)?").format(str(input_dir))
-    ##IF demultiplexing but NOT basecalling
+    ##IF demultiplexing but NOT basecalling specified
     if args.basecalling_model and not args.barcode_kit:
         sys.exit("Cannot perform basecalling and downstream artic analysis without demultiplexing. Please also specify --barcode_kit /-k in your command.")
 
@@ -389,7 +401,7 @@ def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, resume
     print(listToString(basecalling_command))
     return basecalling_command
 
-def get_guppy_barcoder_command(input_dir, save_dir, barcode_kit):
+def get_guppy_barcoder_command(input_dir, save_dir, barcode_kit,resume):
     barcoding_command = ['guppy_barcoder ',
                      '--require_barcodes_both_ends '
                      '--input_path ', input_dir, 
@@ -571,12 +583,12 @@ def main():
     ##Guppy basecalling
     #TODO: add check if basecalling has already been performed
     if args.basecalling_model:
-        basecalling_command=(get_guppy_basecalling_command(fast5_pass_path, fastq_pass_path, basecaller_mode, args.guppy_resume_basecalling, args.guppy_use_cpu))
+        basecalling_command=(get_guppy_basecalling_command(fast5_pass_path, fastq_pass_path, basecalling_model, args.guppy_resume_basecalling, args.guppy_use_cpu))
         run_command([listToString(basecalling_command)], shell=True)
     
     ##Guppy demultiplexing
     if args.basecalling_model or args.barcode_kit:
-        demultiplexing_command=(get_guppy_barcoder_command(fastq_pass_path, fastq_pass_dem_path, barcode_kit))
+        demultiplexing_command=(get_guppy_barcoder_command(fastq_pass_path, fastq_pass_dem_path, barcode_kit,args.guppy_resume_basecalling,))
         run_command([listToString(demultiplexing_command)], shell=True)
     
     #Artic guppyplex and artic minion via PHW's nextflow pipeline
