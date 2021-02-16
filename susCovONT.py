@@ -36,7 +36,7 @@ from subprocess import call
 from subprocess import check_output, CalledProcessError, STDOUT
 import configparser
 from pathlib import Path    
-
+from shutil import copyfile
 
 #Options for basecalling and barcoding
 BASECALLING = collections.OrderedDict([
@@ -63,7 +63,7 @@ BARCODING = collections.OrderedDict([
 #Definitions
 def parse_args():
     #Version
-    parser = ArgumentParser(description='covid-genomics')
+    parser = ArgumentParser(description='susCovONT')
     parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.0')
 
     #Argsgroups
@@ -82,6 +82,7 @@ def parse_args():
     advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions.fault: off.')
     advanced_args.add_argument('--no_move_files', action='store_true', required=False, help='By default, the input fast5_pass and fastq_pass dirs will be moved to subdir 001_rawData. Use this flag if you do not want that')
     advanced_args.add_argument('--no_artic', action='store_true', required=False, help='Use this flag to run only pangolin and nextclade on an already completed artic nextflow (with same folder structure)')
+    advanced_args.add_argument('--dry_run', action='store_true', required=False, help='Executes nothing. Prints the commands that would have been run in a non-dry run.')
 
     #Options to perform basecalling and/or demultiplexing before running artic guppyplex and minion
     optional_args.add_argument('-b', '--basecalling_model', type=str, required=False, choices=["r9.4_fast","r9.4_hac","r10_fast","r10_hac"], help='Use flag to perform basecalling before running the artic pipeline. Indicate which basecalling mode to use. In most cases you want to use a HAC option.')
@@ -178,19 +179,27 @@ def check_artic_version(conda_location):
 #     if not nf_dir_path_full.is_dir():
 #         sys.exit('Error: {} is not a directory'.format(nf_dir_path))
 
-def config_variables():
+def set_config_variables():
+    base_dir = os.path.dirname(os.path.realpath(__file__))
     #Sort out variables from config file
     config=configparser.ConfigParser()
-    config.read(os.path.join(os.path.dirname(__file__),'scripts','config.cfg'))
+    scripts_path=(base_dir+'/scripts')
+    config.read(os.path.join(scripts_path,'config.cfg'))
     config.sections()
     nf_dir_location=config['NF_LOCATION']['nf_location']
     conda_location=config['CONDA_LOCATION']['conda_location']
     number_CPUs=config['CPU']['cpus']
     schemeRepoURL=config['OFFLINE']['schemeRepoURL']
 
-    #TODO: Add default values
+    #Set CPU for nextflow
+    resources_file=(nf_dir_location+'conf/resources.config')
+    set_cpu_to=str("        cpus = "+number_CPUs)
+    set_cpu_command = ["sed -i '5s/.*/",set_cpu_to,
+                       "/' ",resources_file]
+    run_command([combineCommand(set_cpu_command)], shell=True)
 
     return nf_dir_location, conda_location, number_CPUs, schemeRepoURL
+
 
 def check_what_to_run(args):
     if args.input_dir:
@@ -200,7 +209,7 @@ def check_what_to_run(args):
         if outdir[-1] != '/':
             outdir = outdir + '/'
         nf_outdir=(outdir+'002_articPipeline/')
-        artic_outdir=(outdir+'002_articPipeline/articNcovNanopore_sequenceAnalysisNanopolish_articMinIONNanopolish/')
+        artic_outdir=(outdir+'002_articPipeline/qc_pass_climb_upload/')
         consensus_dir=(outdir+'003_consensusFasta/')
         pangolin_outdir=(outdir+'004_pangolin/')
         nextclade_outdir=(outdir+'005_nextclade/')
@@ -221,7 +230,7 @@ def check_arguments(args):
     fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, sequencing_summary_path, print_len_fast5 = check_input(args)
 
     ##Config
-    nf_dir_location, conda_location, number_CPUs, schemeRepoURL = config_variables()
+    nf_dir_location, conda_location, number_CPUs, schemeRepoURL = set_config_variables()
 
     ##Check that tools are installed, set variables
     check_python_version()
@@ -243,7 +252,7 @@ def check_arguments(args):
     print("The input folder is: " + full_path)
     print("The name of your run is: " + run_name)
     print("Found fast5_pass directory with "+print_len_fast5+" fast5 files to analyse")
-    pipeline_commmand = ['The covid-genomics pipeline will: ']
+    pipeline_commmand = ['The susCovONT pipeline will: ']
     if args.basecalling_model:
         pipeline_commmand += ['\n- run basecalling with model', basecalling_model] 
     if args.barcode_kit:
@@ -256,9 +265,10 @@ def check_arguments(args):
         pipeline_commmand += ['\n- only (re)create output report from already completed pipeline run'] 
     if args.offline:
         pipeline_commmand += ['\n- in offline mode'] 
+    if args.dry_run:
+        pipeline_commmand += ['\n- in dry mode (no execution of commands)'] 
 
     print(listToString(pipeline_commmand))
-    logging.info("##########CHECKPOINT END##########")
 
     while True:
         if(yes_or_no('Would you like to run this pipeline? y/n: ')):
@@ -308,27 +318,27 @@ def check_input(args): #TODO: This can be done neater
 
     ''' Unless basecalling or demultiplexing is being performed, FASTQ files
     must be present for the pipeline to run '''
-    #Check if the fastq_pass folder is present
-    fastq_pass=(full_path+"/fastq_pass")
-    fastq_pass_alt=(full_path+"/001_rawData/fastq_pass")
-    fastq_pass_dem=(full_path+"/001_rawData/fastq_pass_demultiplexed")
-    
+    #Check if the fastq_pass folder is present in either of:
+    fastq_pass=(full_path+"/fastq_pass") #FASTQ demultiplexed on ONT (guppy)
+    fastq_pass_undem=(full_path+"/001_rawData/fastq_pass_notDemultiplexed") #FASTQ PASS from guppy basecaller, not demultiplexed. Exists together with fastq_pass
+    fastq_pass_dem=(full_path+"/001_rawData/fastq_pass") #FASTQ PASS from guppy basecaller, demultiplexed
+    sequencing_summary=""
+
     ##IF not demultiplexing or basecalling:
     if not args.barcode_kit and not args.basecalling_model:
         #The fastq_pass folder must exist as we are running nextflow directly on this + fast5.
         if os.path.exists(os.path.join(os.getcwd(),fastq_pass_dem)):
             fastq_pass_dem_path=fastq_pass_dem
-            if os.path.exists(os.path.join(os.getcwd(),fastq_pass_alt)):
-                sequencing_summary=(fastq_pass_alt+"/sequencing_summary.txt") 
-                fastq_pass_path=fastq_pass_alt
-            elif os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
+            if os.path.exists(os.path.join(os.getcwd(),fastq_pass_undem)):
+                sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt") 
+                fastq_pass_path=fastq_pass_undem
+            elif not os.path.exists(os.path.join(os.getcwd(),fastq_pass_undem)):
                 sequencing_summary=(full_path+"/sequencing_summary*.txt") 
-                fastq_pass_path=fastq_pass
-                fastq_pass_dem_path=fastq_pass
+                fastq_pass_path=fastq_pass_dem
             else:
                 sys.exit('Error: Could not find sequencing_summary.txt file to match ' + fastq_pass_dem)
         elif os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
-            #If already basecalled and demultiplexed on the GridION/MinIT:
+            #If already basecalled AND demultiplexed on the GridION/MinIT:
             fastq_pass_path=fastq_pass
             fastq_pass_dem_path=fastq_pass
             sequencing_summary=(full_path+"/sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
@@ -338,28 +348,39 @@ def check_input(args): #TODO: This can be done neater
         if os.path.exists(os.path.join(os.getcwd(),fastq_pass_dem)):
             sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform demultiplexing.'.format(str(fastq_pass_dem)))
     ##IF basecalling and demultiplexing
-    if args.barcode_kit and  args.basecalling_model:
+    if args.barcode_kit and args.basecalling_model:
         if os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
             sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass)))
-        if not os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
-            fastq_pass_path=fastq_pass_alt
+        elif os.path.exists(os.path.join(os.getcwd(),fastq_pass_dem)):
+            sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass_dem)))
+        elif os.path.exists(os.path.join(os.getcwd(),fastq_pass_undem)):
+            sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass_undem)))
+        else:
+            fastq_pass_path=fastq_pass_undem
             fastq_pass_dem_path=fastq_pass_dem
-            sequencing_summary=(fastq_pass_alt+"/sequencing_summary.txt") 
+            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt") 
     ##IF demultiplexing but NOT basecalling
     if args.barcode_kit and not args.basecalling_model:
         #If basecalling not specified, then the basecalled fastq folder must already exist
-        if os.path.exists(os.path.join(os.getcwd(),fastq_pass_alt)):
-            fastq_pass_path=fastq_pass_alt
-            sequencing_summary=(fastq_pass_alt+"/sequencing_summary.txt")
+        if os.path.exists(os.path.join(os.getcwd(),fastq_pass_undem)):
+            fastq_pass_path=fastq_pass_undem
+            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt")
             fastq_pass_dem_path=fastq_pass_dem
         elif os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
             fastq_pass_dem_path=fastq_pass
             sequencing_summary=(full_path+"/sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
         else:
-            sys.exit("Did not find a fastq_pass folder in {}/fastq_pass or {}/001_rawData/fastq_pass. Have you basecalled your fast5s or did you forget to specify basecalling (--basecalling_model)?").format(str(input_dir))
+            sys.exit("Error: Did not find a fastq_pass folder in {}/fastq_pass or {}/001_rawData/fastq_pass. Have you basecalled your fast5s or did you forget to specify basecalling (--basecalling_model)?").format(str(input_dir))
     ##IF demultiplexing but NOT basecalling specified
     if args.basecalling_model and not args.barcode_kit:
-        sys.exit("Cannot perform basecalling and downstream artic analysis without demultiplexing. Please also specify --barcode_kit /-k in your command.")
+        sys.exit("Error: Cannot perform basecalling and downstream artic analysis without demultiplexing. Please also specify --barcode_kit /-k in your command.")
+
+    #Check that the specified sequencing summary actually exists
+    if not args.basecalling_model or not args.barcode_kit:
+        seq_sum_path=Path(sequencing_summary)
+        if not glob.glob(sequencing_summary):
+            sys.exit('Error: {} is not a file'.format(sequencing_summary))
+
 
     return fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, sequencing_summary, print_len_fast5
 
@@ -400,6 +421,7 @@ def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, resume
     
     print(listToString(basecalling_command))
     return basecalling_command
+
 
 def get_guppy_barcoder_command(input_dir, save_dir, barcode_kit,resume):
     barcoding_command = ['guppy_barcoder ',
@@ -443,14 +465,15 @@ def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
     print(combineCommand(pangolin_command))
     return pangolin_command
 
-def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,offline):
+def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,offline,dry_run):
     consensus_base=(run_name+'_sequences.fasta')
-    os.mkdir(nextclade_outdir) #TODO: ADD TRY
+    if not dry_run:
+        os.mkdir(nextclade_outdir) #TODO: ADD TRY
     logging.info('Running nextclade with command: ')
     nextclade_command = []
     if not offline:
-        nextflow_command = ['docker pull neherlab/nextclade:latest ;']  #add option for offline running
-    nextclade_command += ['docker run -it --rm -u 1001 --volume="',consensus_dir, 
+        nextclade_command = ['docker pull neherlab/nextclade:latest ;']  #add option for offline running
+    nextclade_command += ['docker run --rm -u 1001 --volume="',consensus_dir, 
                      ':/seq"  neherlab/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
                      '\' --output-csv \'/seq/',consensus_base,'_nextclade.csv\' ; '
                      'mv ',consensus_dir+consensus_base,'_nextclade.csv ',nextclade_outdir,
@@ -466,13 +489,13 @@ def copy_to_consensus(consensus_dir, artic_outdir, run_name):
         for dirpath, dirs, files in os.walk(artic_outdir):
             for filename in files:
                 if filename.endswith('.consensus.fasta'):
-                    os.symlink(dirpath+filename, consensus_dir+filename)
+                    copyfile(dirpath+'/'+filename, consensus_dir+filename) #TODO: Add sample_name to file?
                     with open(consensus_dir+filename, 'r') as readfile:
                         outfile.write(readfile.read() + "\n\n") 
     consensus_file=outfilename
     return consensus_file
 
-def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_names,final_report_name):
+def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_names,final_report_name, number_CPUs):
     logging.info('Generating run report with QC, lineages and list of mutations')
     #TODO: Add check that files actually exist and that sample_names have correct format:
     print("Found the following files to generate a report for run: " + run_name)
@@ -514,7 +537,7 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
 
     #Create new dataframe with key information
     #From the merged dataframes, take the information you want to be first (rename some of tjen)
-    df_main_results = df_merged[['sample_name_x','run_x','barcode','qc_pass','lineage','clade','missing','totalMutations','totalAminoacidSubstitutions','totalInsertions','totalAminoacidDeletions','substitutions','aaSubstitutions','insertions','deletions','aaDeletions']]
+    df_main_results = df_merged[['sample_name_x','run_x','barcode','qc_pass','lineage','clade','totalAminoacidSubstitutions']]
     #Extract what you want from the three dataframes and merge as one
 
     #Merge the new dataframe and the three original dataframes
@@ -522,33 +545,43 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     df_final_report = reduce(lambda  left,right: pd.merge(left,right,on=['sample_name_x'], how='outer'), final_data_frames)
     #Deselect unneccessary columns
     df_final_report = df_final_report.drop(['run_barcode_artic_nanop_y','run_barcode','ARTIC_y','nanopolish_y','run','run_barcode_artic_nanop_x','run_barcode_y','ARTIC_x','nanopolish_x','run_y','run_barcode_x','run_x_y','barcode_y'], axis=1)
-    df_final_report.insert(17, 'artic_QC', 'artic_QC:')
-    df_final_report.insert(26, 'pangolin_report', 'pangolin_report:')
-    df_final_report.insert(34, 'nextclade_report', 'nextclade_report:')
+    df_final_report.insert(7, 'artic_QC', 'artic_QC:')
+    df_final_report.insert(18, 'pangolin_report', 'pangolin_report:')
+    df_final_report.insert(24, 'nextclade_report', 'nextclade_report:')
 
-    df_final_report.rename({'sample_name_x': 'Sample_name', 'run_x_x': 'Run', 'barcode_x': 'Barcode', 'qc_pass_x': 'QC_status', 'lineage_x': 'pangolin_lineage', 'clade_x': 'nextstrain_clade', 'missing_x': 'missing_bases', 'totalMutations_x': 'TotalMutations', 'totalAminoacidSubstitutions_x': 'TotalAminoacidSubstitutions', 'totalInsertions_x': 'TotalInsertions', 'totalAminoacidDeletions_x': 'TotalAminoacidDeletions', 'substitutions_x': 'NtSubstitutions', 'aaSubstitutions_x': 'AaSubstitutions','insertions_x': 'NtInsertions', 'deletions_x': 'NtDeletions',  'aaDeletions_x': 'AaDeletions'}, axis=1, inplace=True)
+    df_final_report.rename({'sample_name_x': 'Sample_name', 'run_x_x': 'Run', 'barcode_x': 'Barcode', 'qc_pass_x': 'QC_status', 'lineage_x': 'pangolin_lineage', 'clade_x': 'nextstrain_clade', 'totalAminoacidSubstitutions_x': 'TotalAminoacidSubstitutions', 'sample_name_y': 'sample_name', 'qc_pass_y': 'qc_pass', 'lineage_y': 'lineage', 'clade_y': 'clade', 'totalAminoacidSubstitutions_y': 'totalAminoacidSubstitutions'}, axis=1, inplace=True)
+    
+    #Fill any empty rows in the Run col with run_name
+    df_final_report.Run = df_final_report.Run.fillna(run_name)
+
+    #Replace TRUE with PASS and FALSE or . with FAIL
+    os.environ['NUMEXPR_MAX_THREADS'] = number_CPUs
+    df_final_report.QC_status = df_final_report.QC_status.fillna('FAIL')
+    mask = df_final_report.applymap(type) != bool
+    d = {True: 'PASS', False: 'FAIL'}
+    df_final_report = df_final_report.where(mask, df_final_report.replace(d))
 
     #Write to outputfile
     pd.DataFrame.to_csv(df_final_report, final_report_name, sep=',', na_rep='.', index=False)    
     print("Run report written to file: " + final_report_name)
 
-
 def move_input_files(full_path,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_pass_dem_path):
-    #Move fast5_pass 
+    #TODO: shutil.move(source,dest) takes too long. Temp solution: Running via bash:
+    #Move fast5_pass to 001_rawData
     source = os.path.join(full_path, 'fast5_pass')
     dest = os.path.join(raw_data_path, 'fast5_pass')
-    if os.path.exists(source) and os.path.isdir(source):
-        shutil.move(source,dest)
-    #Move fastq_pass
+    if os.path.exists(source) and os.path.isdir(source) and not os.path.exists(dest):
+        move_fast5=['mv', source,
+                    ' ', dest]
+        run_command([listToString(move_fast5)], shell=True)
+
+    #Move fastq_pass_demultiplexed if it is in input dir
     source = os.path.join(full_path, 'fastq_pass')
     dest = os.path.join(raw_data_path, 'fastq_pass')
-    if os.path.exists(source) and os.path.isdir(source):
-        shutil.move(source,dest)
-    #Move fastq_pass_demultiplexed if it is in input dir
-    source = os.path.join(full_path, 'fastq_pass_demultiplexed')
-    dest = os.path.join(raw_data_path, 'fastq_pass_demultiplexed')
-    if os.path.exists(source) and os.path.isdir(source):
-        shutil.move(source,dest)
+    if os.path.exists(source) and os.path.isdir(source) and not os.path.exists(dest):
+        move_fastq=['mv', source,
+                    ' ', dest]
+        run_command([listToString(move_fastq)], shell=True)
 
     #Delete the "work" directory that nextflow leaves behind
     dirpath = os.path.join(full_path, 'work')
@@ -557,7 +590,7 @@ def move_input_files(full_path,raw_data_path,fast5_pass_path,fastq_pass_path,fas
     dirpath = os.path.join(full_path, '.nextflow')
     if os.path.exists(dirpath) and os.path.isdir(dirpath):
         shutil.rmtree(dirpath)
-    
+
 #main
 def main():    
     args = parse_args()
@@ -568,63 +601,87 @@ def main():
     ## Set up log to stdout
     logfile = None
     logging.basicConfig(filename=logfile,level=logging.DEBUG,filemode='w',format='%(asctime)s %(message)s',datefmt='%m-%d-%Y %H:%M:%S')
-    logging.info('Running covid-genomics v.1.0.0') #Print program version
+    logging.info('Running susCovONT v.1.0.0') #Print program version
     logging.info('command line: {0}'.format(' '.join(sys.argv))) #Print input command
 
-
+    
     #Check with user that input is correct before proceeding. Can be skipped with 'yes |' in beginning of command
     #Check input arguments from config and command and set up environment
-    nf_dir_location, conda_location, number_CPUs, schemeRepoURL = config_variables()
+    nf_dir_location, conda_location, number_CPUs, schemeRepoURL = set_config_variables()
+
     full_path, fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, sequencing_summary_path, basecalling_model, barcode_kit, run_name, outdir, nf_outdir, artic_outdir, consensus_dir, pangolin_outdir, nextclade_outdir, nextclade_outfile, pangolin_outfile, artic_qc, sample_name, final_report_name, raw_data_path =check_arguments(args)
 
     fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, sequencing_summary, print_len_fast5 = check_input(args)
 
 
-    ##Guppy basecalling
-    #TODO: add check if basecalling has already been performed
-    if args.basecalling_model:
-        basecalling_command=(get_guppy_basecalling_command(fast5_pass_path, fastq_pass_path, basecalling_model, args.guppy_resume_basecalling, args.guppy_use_cpu))
-        run_command([listToString(basecalling_command)], shell=True)
-    
-    ##Guppy demultiplexing
-    if args.basecalling_model or args.barcode_kit:
-        demultiplexing_command=(get_guppy_barcoder_command(fastq_pass_path, fastq_pass_dem_path, barcode_kit,args.guppy_resume_basecalling,))
-        run_command([listToString(demultiplexing_command)], shell=True)
-    
-    #Artic guppyplex and artic minion via PHW's nextflow pipeline
-    if not args.generate_report_only and not args.no_artic:
-         nextflow_command=(get_nextflow_command(fastq_pass_dem_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
-         run_command([listToString(nextflow_command)], shell=True)
-    consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
-
-    ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
-    if not args.generate_report_only:
-        pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,args.offline))
-        run_command([combineCommand(pangolin_command)], shell=True)
-
-    ##Nextclade lineage assignment and substitutions
-    if not args.generate_report_only: 
-        nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir,args.offline))
-        run_command([combineCommand(nextclade_command)], shell=True)
+    if not args.dry_run:
+        ##Guppy basecalling
+        #TODO: add check if basecalling has already been performed
+        if args.basecalling_model:
+            basecalling_command=(get_guppy_basecalling_command(fast5_pass_path, fastq_pass_path, basecalling_model, args.guppy_resume_basecalling, args.guppy_use_cpu))
+            run_command([listToString(basecalling_command)], shell=True)
         
-    #Generate run report
-    qc_command=(generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,args.sample_names,final_report_name))
-   
-    #Move input files to 001_rawData directory
-    if not args.no_move_files:
-        finish_command=(move_input_files(full_path,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_pass_dem_path))
+        ##Guppy demultiplexing
+        if args.basecalling_model or args.barcode_kit:
+            demultiplexing_command=(get_guppy_barcoder_command(fastq_pass_path, fastq_pass_dem_path, barcode_kit,args.guppy_resume_basecalling,))
+            run_command([listToString(demultiplexing_command)], shell=True)
+        
+        #Artic guppyplex and artic minion via PHW's nextflow pipeline
+        if not args.generate_report_only and not args.no_artic:
+            nextflow_command=(get_nextflow_command(fastq_pass_dem_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
+            run_command([listToString(nextflow_command)], shell=True)
+            consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
+
+        ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
+        if not args.generate_report_only:
+            pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,args.offline))
+            run_command([combineCommand(pangolin_command)], shell=True)
+
+        ##Nextclade lineage assignment and substitutions
+        if not args.generate_report_only: 
+            nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir,args.offline,args.dry_run))
+            run_command([combineCommand(nextclade_command)], shell=True)
+            
+        #Generate run report
+        generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,args.sample_names,final_report_name,number_CPUs)
+    
+        #Move input files to 001_rawData directory
+        if not args.no_move_files:
+            finish_command=(move_input_files(full_path,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_pass_dem_path))
+
+        #Pipeline complete
+        total_time = time.time() - start_time
+        time_mins = float(total_time) / 60
+        logging.info('susCovONT pipeline finished in ' + str(time_mins) + ' mins.')
+
+    #Dry run
+    if args.dry_run:
+        ##Guppy basecalling
+        if args.basecalling_model:
+            basecalling_command=(get_guppy_basecalling_command(fast5_pass_path, fastq_pass_path, basecalling_model, args.guppy_resume_basecalling, args.guppy_use_cpu))
+        ##Guppy demultiplexing
+        if args.basecalling_model or args.barcode_kit:
+            demultiplexing_command=(get_guppy_barcoder_command(fastq_pass_path, fastq_pass_dem_path, barcode_kit,args.guppy_resume_basecalling,))
+        #Artic guppyplex and artic minion via PHW's nextflow pipeline
+        if not args.generate_report_only and not args.no_artic:
+            nextflow_command=(get_nextflow_command(fastq_pass_dem_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
+        consensus_file = "" #copy_to_consensus(consensus_dir,artic_outdir,run_name)
+        ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
+        if not args.generate_report_only:
+            pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,args.offline))
+        ##Nextclade lineage assignment and substitutions
+        if not args.generate_report_only: 
+            nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir,args.offline,args.dry_run))
 
     #Pipeline complete
     total_time = time.time() - start_time
     time_mins = float(total_time) / 60
-    logging.info('Covid-genomics pipeline finished in ' + str(time_mins) + ' mins.')
+    logging.info('susCovONT pipeline finished in ' + str(time_mins) + ' mins.')
 
 if __name__ == '__main__':
     main()
 
 ##TODO:
-## Note: Add own version of qc.py to run?
-## Update CPU in ncov file
 #TODO: Check if Nextflow has already been run (005_nextclade + "nextflowSucess.txt") and you only want to generate report
 #TODO:Check barcode - sample doc
 #TODO: Add check for outdir if different than input dir
