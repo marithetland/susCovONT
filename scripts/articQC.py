@@ -47,7 +47,7 @@ def read_depth_file(bamfile):
     for ln in out.decode('utf-8').split("\n"):
        if ln:
           pos_depth.append(ln.split("\t"))
-   
+    
     return pos_depth
 
 
@@ -56,7 +56,7 @@ def get_covered_pos(pos_depth, min_depth):
     for contig, pos,depth in pos_depth:
         if int(depth) >= min_depth:
             counter = counter + 1
-   
+    
     return counter
 
 def get_N_positions(fasta):
@@ -65,20 +65,18 @@ def get_N_positions(fasta):
     return n_pos
 
 def get_pct_N_bases(fasta):
-   
+    
     count_N = len(get_N_positions(fasta))
 
     pct_N_bases = count_N / len(fasta.seq) * 100
 
     return pct_N_bases
 
-#Manually added def get_N_bases
 def get_N_bases(fasta):
    
     count_N = len(get_N_positions(fasta))
 
     return count_N
-#End manually added def get_N_bases
 
 def get_largest_N_gap(fasta):
     n_pos = get_N_positions(fasta)
@@ -114,7 +112,7 @@ def get_num_reads(bamfile):
     what = shlex.split(command)
 
     return subprocess.check_output(what).decode().strip()
-   
+    
 def go(args):
     if args.illumina:
         depth = 10
@@ -143,22 +141,20 @@ def go(args):
 
         pct_N_bases = get_pct_N_bases(fasta)
         largest_N_gap = get_largest_N_gap(fasta)
+        num_Ns = get_N_bases(fasta) 
 
-        ##Number of Ns #Manually added, nextstrain allows 3000 only
-        num_Ns = get_N_bases(fasta)
-
-    # QC PASS / FAIL
-        if largest_N_gap <= 10000 or pct_N_bases > 10.0 or num_Ns > 3000: #Changed pct_N_bases from 50.0 to 10.0 and manually added 3000 Ns as cutoff
-                qc_pass = "FALSE"
+    	# QC PASS / FAIL
+        if largest_N_gap >= 10000 and pct_N_bases < 10.0:
+                qc_pass = "TRUE"
 
 
     qc_line = { 'sample_name' : args.sample,
                 'N_bases' : "{:.2f}".format(num_Ns),
                 'pct_N_bases' : "{:.2f}".format(pct_N_bases),
-          'pct_covered_bases' : "{:.2f}".format(pct_covered_bases),
+          'pct_covered_bases' : "{:.2f}".format(pct_covered_bases), 
            'longest_no_N_run' : largest_N_gap,
           'num_aligned_reads' : num_reads,
-                       'fasta': args.fasta,
+                       'fasta': args.fasta, 
                         'bam' : args.bam,
                     'qc_pass' : qc_pass}
 
