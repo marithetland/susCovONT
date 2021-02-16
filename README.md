@@ -3,7 +3,7 @@
 **Pipeline to generate consensus.fasta files and identify pangolin lineage and nextstrain clade of Sars-CoV-2 genomes from ONT sequencing.**
 
 
-This pipeline takes as input a folder with name <run_name> which contains the folders `fast5_pass` and `fastq_pass` from Sars-CoV-2 ONT sequencing together with a CSV-file which links barcode and sample name, and it [outputs consensus.fasta files](https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html) along with `<run_name>_report.csv` which includes [pangolin lineage](https://cov-lineages.org/pangolin.html), [nextstrain clade, mutations](https://clades.nextstrain.org/) and QC. 
+This pipeline takes as input a folder with name <run_name> which contains the folders `fast5_pass` and `fastq_pass` from Sars-CoV-2 ONT sequencing together with a CSV-file which links barcode and sample name, and it [outputs consensus.fasta files](https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html) along with `<run_name>_report.csv` which includes [pangolin lineage](https://cov-lineages.org/pangolin.html), [nextstrain clade, mutations](https://clades.nextstrain.org/) and [QC](https://github.com/marithetland/susCovONT/wiki/3.-QC-and-parameters). 
 
 
 ## Quick start
