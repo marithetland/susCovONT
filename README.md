@@ -1,4 +1,4 @@
-# covid-genomics
+# susCovONT
 
 **Pipeline to generate consensus.fasta files and identify pangolin lineage and nextstrain clade of Sars-CoV-2 genomes from ONT sequencing.**
 
@@ -43,3 +43,6 @@ Please note that this script is intended for the use at the AMR lab at Stavanger
 This pipeline uses scripts and pipelines from the [Artic network's nCoV-2019 novel coronavirus bioinformatics protocol] (https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html). See also the [Parameters](https://github.com/marithetland/covid-genomics/wiki/Parameters) page.
 
 Many thanks to the artic, pangolin and nextclade developers for creating the protocols and pipelines!
+
+## Repo name
+This pipeline was created for the analysis of Sars-CoV-2 data from Oxford Nanopore Technologies (ONT) sequencing at Stavanger University Hospital (SUH/SUS). Hence the name, susCovONT: SUS + Covid-19 + ONT.
