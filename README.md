@@ -28,7 +28,7 @@ Note: Basecalling and demultiplexing may also be performed if not already done o
 * [What does the pipeline do?](https://github.com/marithetland/covid-genomics/wiki/What-does-it-do%3F)
 * [How to run](https://github.com/marithetland/covid-genomics/wiki/1.-How-to-run)
 * [Installation](https://github.com/marithetland/covid-genomics/wiki/2.-Installation)
-* [QC parameters and how to change these](https://github.com/marithetland/covid-genomics/wiki/3.-QC)
+* [QC parameters and how to change these](https://github.com/marithetland/susCovONT/wiki/3.-QC-and-parameters)
 * [What does the output look like](https://github.com/marithetland/covid-genomics/wiki/4.-Output)
 * [How to run the commands manually](https://github.com/marithetland/covid-genomics/wiki/6.-Manual-run)
 
