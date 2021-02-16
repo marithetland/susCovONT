@@ -38,9 +38,9 @@ Note: Basecalling and demultiplexing may also be performed if not already done o
 
 
 ## Note and thanks
-Please note that this script is intended for the use at the AMR lab at Stavanger University Hospital, you may need to change it (sprecifically the `scripts/config.cfg` file) for it to work in your environment.
+Please note that this script was created for use at Stavanger University Hospital, you may need to change it (sprecifically the `scripts/config.cfg` file) for it to work in your environment.
 
-This pipeline uses scripts and pipelines from the [Artic network's nCoV-2019 novel coronavirus bioinformatics protocol] (https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html). See also the [Parameters](https://github.com/marithetland/covid-genomics/wiki/Parameters) page.
+This pipeline uses tools from the [Artic network's nCoV-2019 novel coronavirus bioinformatics protocol] (https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html). See also the [QC and parameters](https://github.com/marithetland/susCovONT/wiki/3.-QC-and-parameters) page and [further links here](https://github.com/marithetland/covid-genomics/wiki/What-does-it-do%3F).
 
 Many thanks to the artic, pangolin and nextclade developers for creating the protocols and pipelines!
 
