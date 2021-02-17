@@ -570,31 +570,22 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
 def move_input_files(full_path,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_pass_dem_path):
     #TODO: shutil.move(source,dest) takes too long. Temp solution: Running via bash:
     #Move fast5_pass to 001_rawData
-    source = os.path.join(full_path, 'fast5_pass')
-    dest = os.path.join(raw_data_path, 'fast5_pass')
-    if os.path.isdir(source):
-        if not os.path.isdir(dest):
-            os.mkdir(dest)
-        else:
-            print("Error, directory 001_rawData/fast5_pass already exists.")
-    if os.path.exists(source) and os.path.isdir(source) and not os.path.exists(dest):
+    if not os.path.isdir(os.path.join(raw_data_path, 'fast5_pass')) and os.path.isdir(os.path.join(full_path, 'fast5_pass')):
+        #os.mkdir(dest)
+        source = os.path.join(full_path, 'fast5_pass')
+        dest = os.path.join(raw_data_path, 'fast5_pass')
         move_fast5=['mv', source,
                     ' ', dest]
         run_command([listToString(move_fast5)], shell=True)
 
-    #Move fastq_pass_demultiplexed if it is in input dir
-    source = os.path.join(full_path, 'fastq_pass')
-    dest = os.path.join(raw_data_path, 'fastq_pass')
-    if os.path.isdir(source):
-        if not os.path.isdir(dest):
-            os.mkdir(dest)
-        else:
-            print("Error, directory 001_rawData/fastq_pass already exists.")
-    if os.path.exists(source) and os.path.isdir(source) and not os.path.exists(dest):
+    #Move fastq_pass if it is in input dir
+    if not os.path.isdir(os.path.join(raw_data_path, 'fastq_pass')) and os.path.isdir(os.path.join(full_path, 'fast5_pass')):
+        #os.mkdir(dest)
+        source = os.path.join(full_path, 'fastq_pass')
+        dest = os.path.join(raw_data_path, 'fastq_pass')
         move_fastq=['mv', source,
                     ' ', dest]
         run_command([listToString(move_fastq)], shell=True)
-
     #Delete the "work" directory that nextflow leaves behind
     dirpath = os.path.join(full_path, 'work')
     if os.path.exists(dirpath) and os.path.isdir(dirpath):
