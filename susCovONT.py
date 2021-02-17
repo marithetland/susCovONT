@@ -19,22 +19,21 @@ import glob
 import datetime
 import itertools
 import os, sys, re
+import configparser
 import shutil
 import csv
 import pandas as pd
 from functools import reduce
 from argparse import ArgumentParser
 import subprocess
-from Bio import SeqIO
+#from Bio import SeqIO
 import pathlib
 import collections
-import dateutil.parser
-import random
-import statistics
-import tempfile
-from subprocess import call
-from subprocess import check_output, CalledProcessError, STDOUT
-import configparser
+#import dateutil.parser
+#import random
+#import statistics
+#import tempfile
+from subprocess import call, check_output, CalledProcessError, STDOUT
 from pathlib import Path    
 from shutil import copyfile
 
@@ -473,7 +472,8 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,offline,dry_ru
     nextclade_command = []
     if not offline:
         nextclade_command = ['docker pull neherlab/nextclade:latest ;']  #add option for offline running
-    nextclade_command += ['docker run --rm -u 1000 --volume="',consensus_dir, 
+    nextclade_command += ['docker run --rm -u 1000' #Note for some systems this is 1000, others 1001
+                     ' --volume="',consensus_dir, 
                      ':/seq"  neherlab/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
                      '\' --output-csv \'/seq/',consensus_base,'_nextclade.csv\' ; '
                      'mv ',consensus_dir+consensus_base,'_nextclade.csv ',nextclade_outdir,
@@ -551,7 +551,7 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     df_final_report.insert(18, 'pangolin_report', 'pangolin_report:')
     df_final_report.insert(24, 'nextclade_report', 'nextclade_report:')
 
-    df_final_report.rename({'sample_name_x': 'Sample_name', 'run_x_x': 'Run', 'barcode_x': 'Barcode', 'qc_pass_x': 'QC_status', 'lineage_x': 'pangolin_lineage', 'clade_x': 'nextstrain_clade', 'totalAminoacidSubstitutions_x': 'TotalAminoacidSubstitutions', 'sample_name_y': 'sample_name', 'qc_pass_y': 'qc_pass', 'lineage_y': 'lineage', 'clade_y': 'clade', 'totalAminoacidSubstitutions_y': 'totalAminoacidSubstitutions'}, axis=1, inplace=True)
+    df_final_report.rename({'sample_name_x': 'Sample_name', 'run_x_x': 'Run', 'barcode_x': 'Barcode', 'qc_pass_x': 'QC_status', 'lineage_x': 'pangolin_lineage', 'clade_x': 'nextstrain_clade', 'totalAminoacidSubstitutions_x': 'TotalAminoacidSubstitutions', 'sample_name_y': 'sample_name', 'qc_pass_y': 'qc_pass', 'lineage_y': 'lineage', 'clade_y': 'clade', 'totalAminoacidSubstitutions_y': 'totalAminoacidSubstitutions', 'qc.overallStatus': 'qc_overallStatus'}, axis=1, inplace=True)
     
     #Fill any empty rows in the Run col with run_name
     df_final_report.Run = df_final_report.Run.fillna(run_name)
@@ -563,6 +563,10 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     d = {True: 'PASS', False: 'FAIL'}
     df_final_report = df_final_report.where(mask, df_final_report.replace(d))
 
+    #Add WARN if nextclade report's overall QC is bad:
+    df_final_report.loc[df_final_report.qc_overallStatus == 'bad', 'QC_status'] = "WARN"
+    df_final_report.loc[df_final_report.qc_pass == 'FAIL', 'QC_status'] = "FAIL"
+
     #Write to outputfile
     pd.DataFrame.to_csv(df_final_report, final_report_name, sep=',', na_rep='.', index=False)    
     print("Run report written to file: " + final_report_name)
@@ -571,20 +575,16 @@ def move_input_files(full_path,raw_data_path,fast5_pass_path,fastq_pass_path,fas
     #TODO: shutil.move(source,dest) takes too long. Temp solution: Running via bash:
     #Move fast5_pass to 001_rawData
     if not os.path.isdir(os.path.join(raw_data_path, 'fast5_pass')) and os.path.isdir(os.path.join(full_path, 'fast5_pass')):
-        #os.mkdir(dest)
         source = os.path.join(full_path, 'fast5_pass')
         dest = os.path.join(raw_data_path, 'fast5_pass')
-        move_fast5=['mv', source,
-                    ' ', dest]
+        move_fast5=['mv', source,' ', dest]
         run_command([listToString(move_fast5)], shell=True)
 
     #Move fastq_pass if it is in input dir
     if not os.path.isdir(os.path.join(raw_data_path, 'fastq_pass')) and os.path.isdir(os.path.join(full_path, 'fastq_pass')):
-        #os.mkdir(dest)
         source = os.path.join(full_path, 'fastq_pass')
         dest = os.path.join(raw_data_path, 'fastq_pass')
-        move_fastq=['mv', source,
-                    ' ', dest]
+        move_fastq=['mv', source, ' ', dest]
         run_command([listToString(move_fastq)], shell=True)
     #Delete the "work" directory that nextflow leaves behind
     dirpath = os.path.join(full_path, 'work')
