@@ -579,7 +579,7 @@ def move_input_files(full_path,raw_data_path,fast5_pass_path,fastq_pass_path,fas
         run_command([listToString(move_fast5)], shell=True)
 
     #Move fastq_pass if it is in input dir
-    if not os.path.isdir(os.path.join(raw_data_path, 'fastq_pass')) and os.path.isdir(os.path.join(full_path, 'fast5_pass')):
+    if not os.path.isdir(os.path.join(raw_data_path, 'fastq_pass')) and os.path.isdir(os.path.join(full_path, 'fastq_pass')):
         #os.mkdir(dest)
         source = os.path.join(full_path, 'fastq_pass')
         dest = os.path.join(raw_data_path, 'fastq_pass')
