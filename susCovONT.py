@@ -55,6 +55,11 @@ BARCODING = collections.OrderedDict([
     ('none',         [])
 ])
 
+###TODO:s
+#Order defs logically (just for fun)
+#Add the FASTQ and FAST5 checks in one def , warning if 
+###
+
 #Definitions
 def parse_args():
     #Version
@@ -468,7 +473,7 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,offline,dry_ru
     nextclade_command = []
     if not offline:
         nextclade_command = ['docker pull neherlab/nextclade:latest ;']  #add option for offline running
-    nextclade_command += ['docker run --rm -u 1001 --volume="',consensus_dir, 
+    nextclade_command += ['docker run --rm -u 1000 --volume="',consensus_dir, 
                      ':/seq"  neherlab/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
                      '\' --output-csv \'/seq/',consensus_base,'_nextclade.csv\' ; '
                      'mv ',consensus_dir+consensus_base,'_nextclade.csv ',nextclade_outdir,
@@ -625,7 +630,7 @@ def main():
         if not args.generate_report_only and not args.no_artic:
             nextflow_command=(get_nextflow_command(fastq_pass_dem_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
             run_command([listToString(nextflow_command)], shell=True)
-            consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
+        consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
 
         ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
         if not args.generate_report_only:
