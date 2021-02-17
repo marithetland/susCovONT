@@ -9,7 +9,7 @@ This pipeline takes as input a folder with name <run_name> which contains the fo
 ## Quick start
 
 ```
-python ~/Programs/git/covid-genomics/SARSCoV2_pipeline.py --input_dir /path/to/<run_name> --sample_names sample_names.csv
+python susCovONT.py --input_dir /path/to/<run_name> --sample_names sample_names.csv
 ```
 Where:
 * `--input_dir`: Input directory `<run_name>` must contain `fast5_pass` and `fastq_pass` folders, with the `<run_name>` corresponding to your run (e.g. 20210213_1359_X5_FAO88697_5cf6e6f0)
