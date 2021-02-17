@@ -483,7 +483,9 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,offline,dry_ru
     return nextclade_command
 
 def copy_to_consensus(consensus_dir, artic_outdir, run_name):
-    os.mkdir(consensus_dir) #TODO: ADD TRY
+    consensus_dir_path=Path(consensus_dir)
+    if not consensus_dir_path.is_dir():
+        os.mkdir(consensus_dir) #TODO: ADD TRY
     outfilename=(consensus_dir+run_name+'_sequences.fasta')
     with open(outfilename, 'w') as outfile:
         for dirpath, dirs, files in os.walk(artic_outdir):
@@ -570,6 +572,11 @@ def move_input_files(full_path,raw_data_path,fast5_pass_path,fastq_pass_path,fas
     #Move fast5_pass to 001_rawData
     source = os.path.join(full_path, 'fast5_pass')
     dest = os.path.join(raw_data_path, 'fast5_pass')
+    if os.path.isdir(source):
+        if not os.path.isdir(dest):
+            os.mkdir(dest)
+        else:
+            print("Error, directory 001_rawData/fast5_pass already exists.")
     if os.path.exists(source) and os.path.isdir(source) and not os.path.exists(dest):
         move_fast5=['mv', source,
                     ' ', dest]
@@ -578,6 +585,11 @@ def move_input_files(full_path,raw_data_path,fast5_pass_path,fastq_pass_path,fas
     #Move fastq_pass_demultiplexed if it is in input dir
     source = os.path.join(full_path, 'fastq_pass')
     dest = os.path.join(raw_data_path, 'fastq_pass')
+    if os.path.isdir(source):
+        if not os.path.isdir(dest):
+            os.mkdir(dest)
+        else:
+            print("Error, directory 001_rawData/fastq_pass already exists.")
     if os.path.exists(source) and os.path.isdir(source) and not os.path.exists(dest):
         move_fastq=['mv', source,
                     ' ', dest]
@@ -630,7 +642,7 @@ def main():
         if not args.generate_report_only and not args.no_artic:
             nextflow_command=(get_nextflow_command(fastq_pass_dem_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
             run_command([listToString(nextflow_command)], shell=True)
-        consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name)
+        consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name) ##TODO:FIX mkdir
 
         ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
         if not args.generate_report_only:
