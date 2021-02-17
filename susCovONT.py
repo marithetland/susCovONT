@@ -54,11 +54,6 @@ BARCODING = collections.OrderedDict([
     ('none',         [])
 ])
 
-###TODO:s
-#Order defs logically (just for fun)
-#Add the FASTQ and FAST5 checks in one def , warning if 
-###
-
 #Definitions
 def parse_args():
     #Version
