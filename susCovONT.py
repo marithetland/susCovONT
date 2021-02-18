@@ -568,7 +568,7 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
 
 def move_input_files(full_path,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_pass_dem_path):
     #Make 001_rawDAta if not exists
-    if not os.path.isdir(raw_data_path))):
+    if not os.path.isdir(raw_data_path):
         os.mkdir(raw_data_path)
     raw_data_path
     #TODO: shutil.move(source,dest) takes too long. Temp solution: Running via bash:
