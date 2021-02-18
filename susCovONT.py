@@ -466,7 +466,7 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,offline,dry_ru
     logging.info('Running nextclade with command: ')
     nextclade_command = []
     if not offline:
-        nextclade_command = ['docker pull neherlab/nextclade:latest ;']  #add option for offline running
+        nextclade_command = ['docker pull nextstrain/nextclade ;']  #add option for offline running
     nextclade_command += ['docker run --rm -u 1000' #Note for some systems this is 1000, others 1001
                      ' --volume="',consensus_dir, 
                      ':/seq"  neherlab/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
