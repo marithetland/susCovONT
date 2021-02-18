@@ -461,7 +461,7 @@ def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
 
 def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,offline,dry_run):
     consensus_base=(run_name+'_sequences.fasta')
-    if not dry_run:
+    if not dry_run or not nextclade_outdir.is_dir():
         os.mkdir(nextclade_outdir) #TODO: ADD TRY
     logging.info('Running nextclade with command: ')
     nextclade_command = []
