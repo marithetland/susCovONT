@@ -58,7 +58,7 @@ echo "- Pangolin (and pangolin environment) for artic nextflow pipeline in ${INS
 echo "- Nextstrain/nextclade image will be pulled"
 echo "- Config file for susCovONT will be updated with the paths above."
 
-Read -p "#### Do you wish to proceed the installation with these (y/n)?" choice
+read -p "#### Do you wish to proceed the installation with these (y/n)?" choice
 case "$choice" in 
   y|Y ) echo "Excellent - installing now ...";;
   n|N ) echo "Aborting - you did say no ..."; exit;;
