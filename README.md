@@ -23,6 +23,15 @@ NB03,V2345678_P1
 
 Note: Basecalling and demultiplexing may also be performed if not already done on GridION/MinIT.
 
+# Quick install
+All necessary tools can be installed with the `./scripts/install.sh` script. You need to set the path of INSTALL_DIR, which is where the repositories will be installed (including this one), and you need to have conda and docker installed:
+
+```
+INSTALL_DIR="/home/marit/Programs/"  #Change to your install dir
+cd $INSTALL_DIR
+git clone https://github.com/marithetland/susCovONT  #Clone this repo
+bash ./susCovONT/scripts/install.sh $INSTALL_DIR #Install all necessary tools
+```
 
 ## Please see the wiki for more information:
 * [What does the pipeline do?](https://github.com/marithetland/covid-genomics/wiki/What-does-it-do%3F)
