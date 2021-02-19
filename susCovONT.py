@@ -469,7 +469,7 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,offline,dry_ru
         nextclade_command = ['docker pull nextstrain/nextclade ;']  #add option for offline running
     nextclade_command += ['docker run --rm -u 1000' #Note for some systems this is 1000, others 1001
                      ' --volume="',consensus_dir, 
-                     ':/seq"  neherlab/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
+                     ':/seq"  nextstrain/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
                      '\' --output-csv \'/seq/',consensus_base,'_nextclade.csv\' ; '
                      'mv ',consensus_dir+consensus_base,'_nextclade.csv ',nextclade_outdir,
                      '&>> ',nextclade_outdir,'nextclade_log.txt ']
