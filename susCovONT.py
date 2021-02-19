@@ -72,6 +72,7 @@ def parse_args():
     input_args.add_argument('-s', '--sample_names', type=pathlib.Path, required=True, help='Provide a comma-separated list showing which barcode corresponds to which sample (for final report)')
     
     #Advanced options
+    advanced_args.add_argument('--cpu', type=int, default=20, required=False, help='Specify cpus to use. Default: 20')
     advanced_args.add_argument('--generate_report_only', action='store_true', required=False, help='Do not run any tools, just (re)generate output report from already completed run. Default: off.')
     advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions.fault: off.')
     advanced_args.add_argument('--no_move_files', action='store_true', required=False, help='By default, the input fast5_pass and fastq_pass dirs will be moved to subdir 001_rawData. Use this flag if you do not want that')
@@ -182,21 +183,23 @@ def set_config_variables():
     config.sections()
     nf_dir_location=config['NF_LOCATION']['nf_location']
     conda_location=config['CONDA_LOCATION']['conda_location']
-    number_CPUs=config['CPU']['cpus']
     schemeRepoURL=config['OFFLINE']['schemeRepoURL']
+    
+    return nf_dir_location, conda_location, schemeRepoURL
 
+
+def set_number_cpus(number_CPUs,nf_dir_location):
     #Set CPU for nextflow
     resources_file=(nf_dir_location+'conf/resources.config')
     set_cpu_to=str("        cpus = "+number_CPUs)
     set_cpu_command = ["sed -i.bak '5s/.*/",set_cpu_to,
-                       "/' ",resources_file]
+                      "/' ",resources_file]
+    print("Setting CPU to: " + number_CPUs)
     run_command([combineCommand(set_cpu_command)], shell=True)
-
-    return nf_dir_location, conda_location, number_CPUs, schemeRepoURL
-
 
 def check_what_to_run(args):
     if args.input_dir:
+
         full_path = os.path.abspath(args.input_dir)
         run_name = os.path.basename(full_path) 
         outdir=full_path #TODO:Set optional (parental) outdir
@@ -224,7 +227,7 @@ def check_arguments(args):
     fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, sequencing_summary_path, print_len_fast5 = check_input(args)
 
     ##Config
-    nf_dir_location, conda_location, number_CPUs, schemeRepoURL = set_config_variables()
+    nf_dir_location, conda_location, schemeRepoURL = set_config_variables()
 
     ##Check that tools are installed, set variables
     check_python_version()
@@ -609,7 +612,9 @@ def main():
     
     #Check with user that input is correct before proceeding. Can be skipped with 'yes |' in beginning of command
     #Check input arguments from config and command and set up environment
-    nf_dir_location, conda_location, number_CPUs, schemeRepoURL = set_config_variables()
+    nf_dir_location, conda_location, schemeRepoURL = set_config_variables()
+    cpus_arg=str(args.cpu)
+    set_number_cpus(cpus_arg,nf_dir_location)
 
     full_path, fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, sequencing_summary_path, basecalling_model, barcode_kit, run_name, outdir, nf_outdir, artic_outdir, consensus_dir, pangolin_outdir, nextclade_outdir, nextclade_outfile, pangolin_outfile, artic_qc, sample_name, final_report_name, raw_data_path =check_arguments(args)
 
