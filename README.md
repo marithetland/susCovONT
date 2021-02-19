@@ -23,7 +23,7 @@ NB03,V2345678_P1
 
 Note: Basecalling and demultiplexing may also be performed if not already done on GridION/MinIT.
 
-# Quick install
+## Quick install
 All necessary tools can be installed with the `./scripts/install.sh` script. You need to set the path of INSTALL_DIR, which is where the repositories will be installed (including this one), and you need to have conda and docker installed:
 
 ```
