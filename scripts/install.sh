@@ -11,9 +11,10 @@
 ## Usage
 #bash susCovONT/scripts/install.sh /path/to/install_dir
 
+echo "##### Checking input ..."
 ## Get installation directory from user input and check that the directory exists, then enter dir
 if [ -d $1 ]; then
-    echo "Directory $1 exists."
+    echo "Found $1."
     INSTALL_DIR=$(echo "$(cd "$(dirname "$1")"; pwd)/$(basename "$1")")
     cd $INSTALL_DIR
 else
@@ -23,7 +24,7 @@ fi
 
 # Check that this repo exists under INSTALL_DIR
 if [ -d ${INSTALL_DIR}/susCovONT ]; then
-    echo "Found ${INSTALL_DIR}/susCovONT exists."
+    echo "Found ${INSTALL_DIR}/susCovONT."
 else
     echo "Error: Directory ${INSTALL_DIR}/susCovONT does not exist. Please make sure you have cloned the susCovONT repo in the INSTALL_DIR folder."
     echo "cd ${INSTALL_DIR} ; git clone https://github.com/marithetland/susCovONT"
@@ -48,6 +49,22 @@ else
     echo "Did not find docker in path. Have you installed it?"
     exit
 fi
+
+## Check with user
+echo "##### The following will be installed: " 
+echo "- Artic nextflow pipeline in ${INSTALL_DIR}/ncov2019-artic-nf"
+echo "- Conda environment for artic nextflow pipeline in ${INSTALL_DIR}/conda_for_covid/"
+echo "- Pangolin (and pangolin environment) for artic nextflow pipeline in ${INSTALL_DIR}/pangolin"
+echo "- Nextstrain/nextclade image will be pulled"
+echo "- Config file for susCovONT will be updated with the paths above."
+
+Read -p "#### Do you wish to proceed the installation with these (y/n)?" choice
+case "$choice" in 
+  y|Y ) echo "Excellent - installing now ...";;
+  n|N ) echo "Aborting - you did say no ..."; exit;;
+  * ) echo "Aborting - invalid character. Please respond to prompt with 'y' or 'Y'."; exit;;
+esac
+
 
 ## Git clone artic nextflow pipeline
 echo "##### Cloning artic nextflow pipeline to ${INSTALL_DIR}/ncov2019-artic-nf"
