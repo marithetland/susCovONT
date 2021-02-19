@@ -188,7 +188,7 @@ def set_config_variables():
     #Set CPU for nextflow
     resources_file=(nf_dir_location+'conf/resources.config')
     set_cpu_to=str("        cpus = "+number_CPUs)
-    set_cpu_command = ["sed -i '5s/.*/",set_cpu_to,
+    set_cpu_command = ["sed -i.bak '5s/.*/",set_cpu_to,
                        "/' ",resources_file]
     run_command([combineCommand(set_cpu_command)], shell=True)
 
