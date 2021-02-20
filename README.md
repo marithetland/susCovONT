@@ -3,7 +3,7 @@
 **Pipeline to generate consensus.fasta files and identify pangolin lineage and nextstrain clade of Sars-CoV-2 genomes from ONT sequencing.**
 
 
-This pipeline takes as input a folder with name <run_name> which contains the folders `fast5_pass` and `fastq_pass` and sequencing_summary*.txt from Sars-CoV-2 ONT sequencing together with a CSV-file which links barcode and sample name, and it [outputs consensus.fasta files](https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html) along with `<run_name>_report.csv` which includes [pangolin lineage](https://cov-lineages.org/pangolin.html), [nextstrain clade, mutations](https://clades.nextstrain.org/) and [QC](https://github.com/marithetland/susCovONT/wiki/3.-QC-and-parameters). 
+This pipeline takes as input a folder with name <run_name> which contains the folders `fast5_pass` and `fastq_pass` and `sequencing_summary*.txt` from Sars-CoV-2 ONT sequencing together with a CSV-file which links barcode and sample name, and it [outputs consensus.fasta files](https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html) along with `<run_name>_report.csv` which includes [pangolin lineage](https://cov-lineages.org/pangolin.html), [nextstrain clade, mutations](https://clades.nextstrain.org/) and [QC](https://github.com/marithetland/susCovONT/wiki/3.-QC-and-parameters). 
 
 
 ## Quick start
@@ -12,7 +12,7 @@ This pipeline takes as input a folder with name <run_name> which contains the fo
 python susCovONT.py --input_dir /path/to/<run_name> --sample_names sample_names.csv
 ```
 Where:
-* `--input_dir`: Input directory `<run_name>` must contain `fast5_pass` and `fastq_pass` folders, with the `<run_name>` corresponding to your run (e.g. 20210213_1359_X5_FAO88697_5cf6e6f0)
+* `--input_dir`: Input directory `<run_name>` must contain `fast5_pass` and `fastq_pass` folders and `sequencing_summary*.txt`, with the `<run_name>` corresponding to your run (e.g. 20210213_1359_X5_FAO88697_5cf6e6f0)
 * `--sample_names`: A CSV-file which connects barcodes with sample names, following the format:
 ```
 barcode,sample_name
