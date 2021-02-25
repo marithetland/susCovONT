@@ -91,7 +91,7 @@ def parse_args():
     #output_args.add_argument('-o', '--outdir', type=pathlib.Path, required=False, default='.', help='Output directory for all output files. Only specify if different to input directory.')
     return parser.parse_args()
 
-def run_command(command, **kwargs): #yekwahs
+def run_command(command, **kwargs):
     command_str = ''.join(command)
     #logging.info('Running shell command: {}'.format(command_str))
     try:
@@ -130,6 +130,9 @@ def fileCount(path, extension):
         count += sum(f.endswith(extension) for f in files)
     return count
 
+def check_barcodeID(value, pattern=re.compile("barcode[0-9][0-9]")):
+    return 'TRUE' if pattern.match(value) else 'FALSE'
+    
 def yes_or_no(question):
     reply = str(input(question+' (y/n): ')).lower().strip()
     if reply[0] == 'y':
@@ -141,19 +144,21 @@ def yes_or_no(question):
     else:
         return yes_or_no("Please Enter (y/n) ")
 
-def check_python_version():
+def check_guppy_version(full_path):
+   run_command(['echo -n "guppy_basecaller \t" >> ',full_path,'/pipeline_versions.txt ; guppy_basecaller --version >> ',full_path,'/pipeline_versions.txt'], shell=True) ##Check for empty results, skip
+   pass
+
+def check_versions(conda_location,nf_dir_location,full_path):
+    ## Check that (correct versions of) programs exist:
+    #check_python_version()
     try:
         assert sys.version_info >= (3, 5)
-        run_command(['echo "Pipeline versions \n" > pipeline_versions.txt'], shell=True) #Overwrite any previous file
+        run_command(['echo "Pipeline versions \n" >> ',full_path,'/pipeline_versions.txt'], shell=True) #Overwrite any previous file
     except AssertionError:
         sys.exit('Error: Python 3.5 or greater is required')
 
-def check_guppy_version():
-   run_command(['echo -n "guppy_basecaller \t" >> pipeline_versions.txt ; guppy_basecaller --version >> pipeline_versions.txt'], shell=True) ##Check for empty results, skip
-   pass
-
-def check_nextflow_version():
-    nextflow_version = run_command(['echo -n "nextflow \t" >> pipeline_versions.txt ; nextflow -version | grep version >> pipeline_versions.txt'], shell=True)     ##Check that version is correct
+    #check_nextflow_version():
+    nextflow_version = run_command(['echo -n "nextflow \t" >> ',full_path,'/pipeline_versions.txt ; nextflow -version | grep version >> ',full_path,'/pipeline_versions.txt'], shell=True)     ##Check that version is correct
     current_version ="      version 20.10.0 build 5430"
     try:
         if nextflow_version == current_version:
@@ -162,8 +167,8 @@ def check_nextflow_version():
         sys.exit('Error: Nextflow version 20.10.0 is required')
     return
 
-def check_artic_version(conda_location):
-    run_command(['echo -n "artic \t" >> pipeline_versions.txt ; ',conda_location,'/artic-2c6f8ebeb615d37ee3372e543ec21891/bin/artic --version >> pipeline_versions.txt'], shell=True) ##Check for empty results, skip
+    #check_artic_version(conda_location):
+    run_command(['echo -n "artic \t" >> ',full_path,'/pipeline_versions.txt ; ',conda_location,'/artic-2c6f8ebeb615d37ee3372e543ec21891/bin/artic --version >> ',full_path,'/pipeline_versions.txt'], shell=True) ##Check for empty results, skip
     pass
 
 # def check_pangolin_version():
@@ -175,17 +180,11 @@ def check_artic_version(conda_location):
 #     nf_dir_path = Path(nf_dir_location)
 #     if not nf_dir_path_full.is_dir():
 #         sys.exit('Error: {} is not a directory'.format(nf_dir_path))
-
-def check_versions(conda_location,nf_dir_location):
-    ## Check that (correct versions of) programs exist:
-    check_python_version()
-    check_nextflow_version()
-    check_artic_version(conda_location)
-    #check_pangolin_version ##TODO
-    #check_ncov2019_nextflow_exists ##TODO
+    ##END
 
 def set_config_variables(args):
     base_dir = os.path.dirname(os.path.realpath(__file__))
+    full_path = os.path.abspath(args.input_dir)
     #Sort out variables from config file
     config=configparser.ConfigParser()
     scripts_path=(base_dir+'/scripts')
@@ -205,12 +204,9 @@ def set_config_variables(args):
     os.environ['NUMEXPR_MAX_THREADS'] = number_CPUs
 
     #Check if basecalling or demultiplexing is being performed and check that tools exist
-    check_versions(conda_location,nf_dir_location)
+    check_versions(conda_location,nf_dir_location,full_path)
 
     return nf_dir_location, conda_location, schemeRepoURL
-
-def check_barcodeID(value, pattern=re.compile("barcode[0-9][0-9]")):
-    return 'TRUE' if pattern.match(value) else 'FALSE'
 
 def get_sample_names(sample_names):
     #Check that the sample file exists and has correct format (try to edit if possible)
@@ -278,11 +274,11 @@ def check_input(args):
     model_choices = list(BASECALLING.keys())
     barcode_choices = list(BARCODING.keys())
     if args.basecalling_model:
-        check_guppy_version()
+        check_guppy_version(outdir)
         if args.basecalling_model not in model_choices:
             sys.exit('Error: valid --model choices are: {}'.format(join_with_or(model_choices)))
     if args.barcode_kit:
-        check_guppy_version()
+        check_guppy_version(outdir)
         if args.barcode_kit not in barcode_choices:
             sys.exit('Error: valid --barcodes choices are: {}'.format(join_with_or(barcode_choices)))
     
