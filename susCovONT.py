@@ -249,10 +249,10 @@ def check_input(args):
             outdir = outdir + '/'
 
     ##Check that the fast5_pass folder with files (recursive) exists in the input dir
-    fast5_pass=(outdir+"fast5_pass/") 
-    fast5_pass_alt=(outdir+"001_rawData/fast5_pass/")
-    if not os.path.exists(os.path.join(os.getcwd(),fast5_pass)):
-        if os.path.exists(os.path.join(os.getcwd(),fast5_pass_alt)):
+    fast5_pass=os.path.join(outdir,"fast5_pass/") 
+    fast5_pass_alt=os.path.join(outdir,"001_rawData/fast5_pass/")
+    if not os.path.exists(fast5_pass):
+        if os.path.exists(fast5_pass_alt):
             len_fast5=fileCount(fast5_pass_alt, '.fast5')
             if len_fast5 != 0:
                 fast5_pass_path=fast5_pass_alt
@@ -260,7 +260,7 @@ def check_input(args):
                 sys.exit('Error: Found no .fast5 files. Please check that your input directory is correct.')
         else:
             sys.exit('Error: {} is not a directory'.format(fast5_pass))
-    if os.path.exists(os.path.join(os.getcwd(),fast5_pass)):
+    if os.path.exists(fast5_pass):
         len_fast5=fileCount(fast5_pass, '.fast5')
         if len_fast5 != 0:
             fast5_pass_path=fast5_pass
@@ -282,82 +282,76 @@ def check_input(args):
     
     ##Check FASTQ files
     #If not basecalling or demultiplexing, FASTQ files must be present for artic minion to run
+    fastq_pass=os.path.join(outdir,"fastq_pass") #FASTQ demultiplexed on ONT (guppy), stored in run_name dir
+    fastq_pass_undem=os.path.join(outdir,"001_rawData/fastq_pass_notDemultiplexed") #FASTQ PASS from guppy basecaller, not demultiplexed. Exists together with fastq_pass under 001_rawData/
+    fastq_pass_dem=os.path.join(outdir,"001_rawData/fastq_pass") #FASTQ PASS from guppy basecaller, demultiplexed
+    sequencing_summary=""
 
-    #Check if the fastq_pass folder is present in either of:
-    if not args.basecalling_model:
-        fastq_pass=(outdir+"fastq_pass") #FASTQ demultiplexed on ONT (guppy)
-        fastq_pass_undem=(outdir+"001_rawData/fastq_pass_notDemultiplexed") #FASTQ PASS from guppy basecaller, not demultiplexed. Exists together with fastq_pass
-        fastq_pass_dem=(outdir+"001_rawData/fastq_pass") #FASTQ PASS from guppy basecaller, demultiplexed
-        sequencing_summary=""
-    # if not args.basecalling_model and args.barcode_kit:
-    #     fastq_pass_undem=(outdir+"/001_rawData/fastq_pass_notDemultiplexed") #FASTQ PASS from guppy basecaller, not demultiplexed. Exists together with fastq_pass
-
-    ##IF not demultiplexing or basecalling:
+    ##If not demultiplexing or basecalling:
     if not args.barcode_kit and not args.basecalling_model:
         #The fastq_pass folder must exist as we are running nextflow directly on this + fast5.
-        if os.path.exists(os.path.join(os.getcwd(),fastq_pass_dem)):
+        if os.path.exists(fastq_pass_dem):
             fastq_pass_dem_path=fastq_pass_dem
-            if os.path.exists(os.path.join(os.getcwd(),fastq_pass_undem)):
-                sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt") 
+            if os.path.exists(fastq_pass_undem):
+                sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt") 
                 fastq_pass_path=fastq_pass_undem
-            elif not os.path.exists(os.path.join(os.getcwd(),fastq_pass_undem)):
-                sequencing_summary=(outdir+"/sequencing_summary*.txt") 
+            elif not os.path.exists(fastq_pass_undem):
+                sequencing_summary=(outdir+"sequencing_summary*.txt") 
                 fastq_pass_path=fastq_pass_dem
             else:
                 sys.exit('Error: Could not find sequencing_summary.txt file to match ' + fastq_pass_dem)
-        elif os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
+        elif os.path.exists(fastq_pass):
             #If already basecalled AND demultiplexed on the GridION/MinIT:
             fastq_pass_path=fastq_pass
             fastq_pass_dem_path=fastq_pass
-            sequencing_summary=(outdir+"/sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
+            sequencing_summary=(outdir+"sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
     ##IF demultiplexing
     if args.barcode_kit:
         #Check that there isn't already a folder called fastq_pass_demultiplexed
-        if os.path.exists(os.path.join(os.getcwd(),fastq_pass_dem)):
+        if os.path.exists(fastq_pass_dem):
             sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform demultiplexing.'.format(str(fastq_pass_dem)))
-    ##IF basecalling and demultiplexing
+
+    ##If basecalling (and therefore demultiplexing)
+    if args.basecalling_model and not args.barcode_kit:
+        sys.exit("Error: Cannot perform basecalling and downstream artic analysis without demultiplexing. Please also specify --barcode_kit /-k in your command.")
     if args.barcode_kit and args.basecalling_model:
-        if os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
+        if os.path.exists(fastq_pass):
             sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass)))
-        elif os.path.exists(os.path.join(os.getcwd(),fastq_pass_dem)):
+        elif os.path.exists(fastq_pass_dem):
             sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass_dem)))
-        elif os.path.exists(os.path.join(os.getcwd(),fastq_pass_undem)):
+        elif os.path.exists(fastq_pass_undem):
             sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass_undem)))
         else:
             fastq_pass_path=fastq_pass_undem
             fastq_pass_dem_path=fastq_pass_dem
-            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt") 
-    ##IF demultiplexing but NOT basecalling
+            sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt") 
+
+    ##If demultiplexing but not basecalling
     if args.barcode_kit and not args.basecalling_model:
         #If basecalling not specified, then the basecalled fastq folder must already exist
-        if os.path.exists(os.path.join(os.getcwd(),fastq_pass_undem)):
+        if os.path.exists(fastq_pass_undem):
             fastq_pass_path=fastq_pass_undem
-            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt")
+            sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt")
             fastq_pass_dem_path=fastq_pass_dem
-        elif os.path.exists(os.path.join(os.getcwd(),fastq_pass)):
+        elif os.path.exists(fastq_pass):
             fastq_pass_dem_path=fastq_pass
-            sequencing_summary=(outdir+"/sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
+            sequencing_summary=(outdir+"sequencing_summary*.txt")
         else:
-            sys.exit("Error: Did not find a fastq_pass folder in {}/fastq_pass or {}/001_rawData/fastq_pass. Have you basecalled your fast5s or did you forget to specify basecalling (--basecalling_model)?").format(str(input_dir))
-    ##IF demultiplexing but NOT basecalling specified
-    if args.basecalling_model and not args.barcode_kit:
-        sys.exit("Error: Cannot perform basecalling and downstream artic analysis without demultiplexing. Please also specify --barcode_kit /-k in your command.")
+            sys.exit("Error: Did not find a fastq_pass folder in {}/fastq_pass or {}/001_rawData/fastq_pass. Have you basecalled your fast5s or did you forget to specify basecalling (--basecalling_model)?").format(str(outdir))
     
     #Check that the specified sequencing summary actually exists
     if not args.basecalling_model or not args.barcode_kit:
-        seq_sum_path=Path(sequencing_summary)
-        if not glob.glob(sequencing_summary): #TODO: seq_sum_path?
-            sys.exit('Error: {} is not a file'.format(sequencing_summary))
+        if not args.seq_sum_file:
+            seq_summary_exist2=[os.path.abspath(x) for x in glob.glob(sequencing_summary)]
+            seq_summary=listToString(seq_summary_exist2)
+        elif args.seq_sum_file:
+            seq_summary=os.path.abspath(args.seq_sum_file)
+        if not os.path.exists(seq_summary):
+            sys.exit('Error: {} is not a file, or multiple sequence summary files were found. Please specify the full path with --seq_sum_file flag.'.format(seq_summary))
 
-    #TODO: seq_sum_file
-    # if args.seq_sumfile is file:
-    #         sequencing_summary= ""
-    # else: find it - and if not found, set the name to what it will be called
-    ##TODO: The same for the sample_names file
-    #sample_name=str(args.sample_names)
     sample_df=get_sample_names(args.sample_names)
 
-    return run_name, outdir, fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, sequencing_summary, sample_df
+    return run_name, outdir, fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, seq_summary, sample_df
 
 
 
@@ -428,7 +422,8 @@ def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
 def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,dry_run):
     consensus_base=(run_name+'_sequences.fasta')
     ##TODO: ADD --jobs=str(cpus) to command - check if works
-    if not dry_run or not Path(nextclade_outdir).is_dir():
+    #if not dry_run:
+    if not Path(nextclade_outdir).is_dir():
         os.mkdir(nextclade_outdir)
     logging.info('Running nextclade with command: ')
     nextclade_command = []
@@ -437,10 +432,10 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,d
     nextclade_command += ['docker run --rm -u 1001' #Note for some systems this is 1000, others 1001
                      ' --volume="',consensus_dir, 
                      ':/seq"  nextstrain/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
-                     '\' --output-csv \'/seq/',consensus_base,'_nextclade.csv\' '
+                     '\' --output-csv \'/seq/nextclade.csv\' '
                      ' --jobs=',str(cpus),' ; '
-                     'mv ',consensus_dir+consensus_base,'_nextclade.csv ',nextclade_outdir,
-                     '&>> ',nextclade_outdir,'nextclade_log.txt ']
+                     'mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,
+                     ' &>> ',nextclade_outdir,'nextclade_log.txt ']
     
     print(combineCommand(nextclade_command))
     return nextclade_command
@@ -463,8 +458,8 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     logging.info('Generating run report for run '+run_name+' with QC, lineages and list of mutations')
     if not os.path.isfile(artic_qc):
         sys.exit('Error: {} is not a file. Please check your input.'.format(artic_qc))
-    if not os.path.isfile(nextclade_outfile):
-        sys.exit('Error: {} is not a file. Please check your input.'.format(nextclade_outfile))
+    #if not os.path.exists(nextclade_outfile): ##TODO: FIX this
+    #    sys.exit('Error: {} is not a file. Please check your input.'.format(nextclade_outfile))
     if not os.path.isfile(pangolin_outfile):
         sys.exit('Error: {} is not a file. Please check your input.'.format(pangolin_outfile))
     if not isinstance(sample_df, pd.DataFrame):
@@ -571,16 +566,16 @@ def main():
     
     ##Set output subdirectories
     #outdir=outdir #TODO:Set optional (parental) outdir
-    raw_data_path=(outdir+'001_rawData/')
-    nf_outdir=(outdir+'002_articPipeline/')
-    artic_outdir=(outdir+'002_articPipeline/qc_pass_climb_upload/')
-    artic_qc=(outdir+'002_articPipeline/'+run_name+'.qc.csv')
-    consensus_dir=(outdir+'003_consensusFasta/')
-    pangolin_outdir=(outdir+'004_pangolin/')
-    pangolin_outfile=(outdir+'004_pangolin/lineage_report.csv')
-    nextclade_outdir=(outdir+'005_nextclade/')
-    nextclade_outfile=(outdir+'005_nextclade/'+run_name+'_sequences.fasta_nextclade.csv')
-    final_report_name=(run_name+'_report.csv')
+    raw_data_path=os.path.join(outdir,'001_rawData/')
+    nf_outdir=os.path.join(outdir,'002_articPipeline/')
+    artic_outdir=os.path.join(outdir,'002_articPipeline/qc_pass_climb_upload/')
+    artic_qc=os.path.join(outdir,'002_articPipeline/'+run_name+'.qc.csv')
+    consensus_dir=os.path.join(outdir,'003_consensusFasta/')
+    pangolin_outdir=os.path.join(outdir,'004_pangolin/')
+    pangolin_outfile=os.path.join(outdir,'004_pangolin/lineage_report.csv')
+    nextclade_outdir=os.path.join(outdir,'005_nextclade/')
+    nextclade_outfile=os.path.join(outdir,'005_nextclade/nextclade.csv')
+    final_report_name=os.path.join(outdir,'_report.csv')
 
     ##Check with user that the input is correct
     logging.info("##########CHECKPOINT##########")
@@ -588,6 +583,7 @@ def main():
     print("The name of your run is: " + run_name)
     print("Found fast5_pass directory with "+str(fileCount(fast5_pass_path, '.fast5'))+" fast5 files to analyse")
     print("Your barcodes are specified in: " + os.path.abspath(args.sample_names))
+    print("And the sequencing summary txt file is: " + os.path.abspath(sequencing_summary))
 
     pipeline_commmand = ['The susCovONT pipeline will: ']
     if args.basecalling_model:
@@ -634,12 +630,11 @@ def main():
             run_command([listToString(nextflow_command)], shell=True)
     
     ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
-    if not args.generate_report_only and not args.dry_run:
+    if not args.generate_report_only:
         consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name) ##TODO:FIX mkdir
         pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir,args.cpu,args.offline))
-        run_command([combineCommand(pangolin_command)], shell=True)
-        if args.dry_run:
-            consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name) ##TODO:FIX mkdir
+        if not args.dry_run:    
+            run_command([combineCommand(pangolin_command)], shell=True)
 
     ##Nextclade lineage assignment and substitutions
     if not args.generate_report_only:
