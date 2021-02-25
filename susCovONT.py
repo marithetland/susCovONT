@@ -495,7 +495,7 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     final_data_frames = [df_main_results, df_merged]
     df_final_report = reduce(lambda  left,right: pd.merge(left,right,on=['sample_name_x'], how='outer'), final_data_frames)
     #Deselect unneccessary columns
-    df_final_report = df_final_report.drop(['run_barcode_artic_nanop_y','run_barcode','ARTIC_y','nanopolish_y','run','run_barcode_artic_nanop_x','run_barcode_y','ARTIC_x','nanopolish_x','run_y','run_barcode_x','run_x_y','barcode_y'], axis=1)
+    df_final_report = df_final_report.drop(['run_barcode_artic_nanop_y','run_barcode','barcode_check','ARTIC_y','nanopolish_y','run','run_barcode_artic_nanop_x','run_barcode_y','ARTIC_x','nanopolish_x','run_y','run_barcode_x','run_x_y','barcode_y'], axis=1)
     df_final_report.insert(7, 'artic_QC', 'artic_QC:')
     df_final_report.insert(17, 'pangolin_report', 'pangolin_report:')
     df_final_report.insert(24, 'nextclade_report', 'nextclade_report:')
