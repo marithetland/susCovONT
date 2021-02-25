@@ -209,6 +209,9 @@ def set_config_variables(args):
 
     return nf_dir_location, conda_location, schemeRepoURL
 
+def check_barcodeID(value, pattern=re.compile("barcode[0-9][0-9]")):
+    return 'TRUE' if pattern.match(value) else 'FALSE'
+
 def get_sample_names(sample_names):
     #Check that the sample file exists and has correct format (try to edit if possible)
     if not sample_names.is_file():
@@ -232,8 +235,12 @@ def get_sample_names(sample_names):
         sample_df['barcode']=sample_df['barcode'].str.replace('barcodes', 'barcode')
         sample_df['barcode']=sample_df['barcode'].str.replace(' ', '')
         sample_df['sample_name']= sample_df['sample_name'].str.replace(' ', '')
-        #TODO:Check that the barcode column now begins with barcode[0-9][0-9]. If not give error and sysexit
-
+        #Check that the barcode column values all follow pattern: "barcode[0-9][0-9]"
+        sample_df['barcode_check'] = sample_df['barcode'].apply(check_barcodeID)
+        if not len(sample_df['barcode_check'].unique()) ==1:
+            sys.exit('Not all rows in \'barcode\' follow format \'barcode[0-9][0-9]\' in file {}. Please check your input. '.format(sample_names))
+        elif (sample_df['barcode_check'].unique()) == "FALSE":
+            sys.exit('No rows in \'barcode\' follow format \'barcode[0-9][0-9]\' in file {}. Please check your input. '.format(sample_names))
     return sample_df
 
 def check_input(args): 
@@ -278,7 +285,6 @@ def check_input(args):
         check_guppy_version()
         if args.barcode_kit not in barcode_choices:
             sys.exit('Error: valid --barcodes choices are: {}'.format(join_with_or(barcode_choices)))
-    #TODO: ADD ifs for if basecalling and ifs for if demultiplexing?
     
     ##Check FASTQ files
     #If not basecalling or demultiplexing, FASTQ files must be present for artic minion to run
@@ -348,12 +354,11 @@ def check_input(args):
             seq_summary=os.path.abspath(args.seq_sum_file)
         if not os.path.exists(seq_summary):
             sys.exit('Error: {} is not a file, or multiple sequence summary files were found. Please specify the full path with --seq_sum_file flag.'.format(seq_summary))
-
+    
+    #Check sample file and get df
     sample_df=get_sample_names(args.sample_names)
 
     return run_name, outdir, fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, seq_summary, sample_df
-
-
 
 def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, resume, cpu):
     basecalling_command = ['guppy_basecaller ',
