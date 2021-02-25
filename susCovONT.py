@@ -223,8 +223,6 @@ def get_sample_names(sample_names):
             sys.exit('Error: Could not find column "barode" in file {}.'.format(sample_names))
         if not 'sample_name' in sample_df.columns:
             sys.exit('Error: Could not find column "sample_name" in file {}.'.format(sample_names))
-        if 'barcode' in sample_df.columns and 'sample_name' in sample_df.columns:
-            sample_names=sample_names 
         #Make sure sample names are given correctly
         sample_df['barcode']=sample_df['barcode'].str.lower()
         sample_df['barcode']=sample_df['barcode'].str.replace('nb', 'barcode')
@@ -430,7 +428,7 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,d
     nextclade_command = []
     if not offline:
         nextclade_command = ['docker pull nextstrain/nextclade ;'] 
-    nextclade_command += ['docker run --rm -u 1001' #Note for some systems this is 1000, others 1001
+    nextclade_command += ['docker run --rm -u 1000' #Note for some systems this is 1000, others 1001
                      ' --volume="',consensus_dir, 
                      ':/seq"  nextstrain/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
                      '\' --output-csv \'/seq/nextclade.csv\' '
@@ -531,7 +529,6 @@ def move_input_files(outdir,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_
         dest = os.path.join(raw_data_path, 'fast5_pass')
         move_fast5=['mv', source,' ', dest]
         run_command([listToString(move_fast5)], shell=True)
-
     #Move fastq_pass if it is in input dir
     if not os.path.isdir(os.path.join(raw_data_path, 'fastq_pass')) and os.path.isdir(os.path.join(outdir, 'fastq_pass')):
         source = os.path.join(outdir, 'fastq_pass')
@@ -612,7 +609,6 @@ def main():
 
     ###Run pipeline
     ##Guppy basecalling
-    #TODO: add check if basecalling has already been performed
     if args.basecalling_model:
         basecalling_command=(get_guppy_basecalling_command(fast5_pass_path, fastq_pass_path, args.basecalling_model.lower(), args.guppy_resume_basecalling, args.guppy_use_cpu))
         if not args.dry_run:
