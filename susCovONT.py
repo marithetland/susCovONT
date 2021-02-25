@@ -461,19 +461,19 @@ def copy_to_consensus(consensus_dir, artic_outdir, run_name):
 
 def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name):
     logging.info('Generating run report for run '+run_name+' with QC, lineages and list of mutations')
-    if not Path(artic_qc).is_file():
+    if not os.path.isfile(artic_qc):
         sys.exit('Error: {} is not a file. Please check your input.'.format(artic_qc))
-    if not Path(nextclade_outfile).is_file():
+    if not os.path.isfile(nextclade_outfile):
         sys.exit('Error: {} is not a file. Please check your input.'.format(nextclade_outfile))
-    if not Path(pangolin_outfile).is_file():
+    if not os.path.isfile(pangolin_outfile):
         sys.exit('Error: {} is not a file. Please check your input.'.format(pangolin_outfile))
     if not isinstance(sample_df, pd.DataFrame):
         sys.exit('Error: {} is not a file. Please check your input.'.format(sample_df))
 
     #Read in files to dataframes
-    artic_df = pd.read_csv(Path(artic_qc), sep=',', header=0, encoding='utf8', engine='python')
-    nclade_df = pd.read_csv(Path(nextclade_outfile), sep=';', header=0, encoding='utf8', engine='python')
-    pangolin_df = pd.read_csv(Path(pangolin_outfile), sep=',', header=0, encoding='utf8', engine='python')
+    artic_df = pd.read_csv(artic_qc, sep=',', header=0, encoding='utf8', engine='python')
+    nclade_df = pd.read_csv(nextclade_outfile, sep=';', header=0, encoding='utf8', engine='python')
+    pangolin_df = pd.read_csv(pangolin_outfile, sep=',', header=0, encoding='utf8', engine='python')
 
     artic_df['run_barcode'] = artic_df.loc[:, 'sample_name']
     nclade_df['run_barcode_artic_nanop'] = nclade_df.loc[:, 'seqName']
@@ -501,7 +501,7 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     #Deselect unneccessary columns
     df_final_report = df_final_report.drop(['run_barcode_artic_nanop_y','run_barcode','ARTIC_y','nanopolish_y','run','run_barcode_artic_nanop_x','run_barcode_y','ARTIC_x','nanopolish_x','run_y','run_barcode_x','run_x_y','barcode_y'], axis=1)
     df_final_report.insert(7, 'artic_QC', 'artic_QC:')
-    df_final_report.insert(18, 'pangolin_report', 'pangolin_report:')
+    df_final_report.insert(17, 'pangolin_report', 'pangolin_report:')
     df_final_report.insert(24, 'nextclade_report', 'nextclade_report:')
 
     df_final_report.rename({'sample_name_x': 'Sample_name', 'run_x_x': 'Run', 'barcode_x': 'Barcode', 'qc_pass_x': 'QC_status', 'lineage_x': 'pangolin_lineage', 'clade_x': 'nextstrain_clade', 'totalAminoacidSubstitutions_x': 'TotalAminoacidSubstitutions', 'sample_name_y': 'sample_name', 'qc_pass_y': 'qc_pass', 'lineage_y': 'lineage', 'clade_y': 'clade', 'totalAminoacidSubstitutions_y': 'totalAminoacidSubstitutions', 'qc.overallStatus': 'qc_overallStatus'}, axis=1, inplace=True)
