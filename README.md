@@ -3,10 +3,19 @@
 **Pipeline to generate consensus.fasta files and identify pangolin lineage and nextstrain clade of Sars-CoV-2 genomes from ONT sequencing.**
 
 
-This pipeline takes as input a folder with name <run_name> which contains the folders `fast5_pass` and `fastq_pass` and `sequencing_summary*.txt` from Sars-CoV-2 ONT sequencing together with a CSV-file which links barcode and sample name, and it [outputs consensus.fasta files](https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html) along with `<run_name>_report.csv` which includes [pangolin lineage](https://cov-lineages.org/pangolin.html), [nextstrain clade, mutations](https://clades.nextstrain.org/) and [QC](https://github.com/marithetland/susCovONT/wiki/3.-QC-and-parameters). 
+This pipeline takes as input a folder with name `<run_name>` which contains the folders `fast5_pass` and `fastq_pass` and `sequencing_summary*.txt` from Sars-CoV-2 ONT sequencing together with a CSV-file which links barcode and sample name, and it [outputs consensus.fasta files](https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html) along with `<run_name>_report.csv` which includes [pangolin lineage](https://cov-lineages.org/pangolin.html), [nextstrain clade, mutations](https://clades.nextstrain.org/) and [QC](https://github.com/marithetland/susCovONT/wiki/3.-QC-and-parameters). 
 
+## Installation
+Install all necessary tools and environments with `susCovONT/scripts/install.sh`. You need to set the path of INSTALL_DIR, which is where the repositories will be installed (including this one), and [conda and docker has to be installed](https://github.com/marithetland/susCovONT/wiki/2.-Installation#installing-docker-and-conda):
 
-## Quick start
+```
+INSTALL_DIR=/home/susamr/Programs/  #Change to your install dir
+cd $INSTALL_DIR
+git clone https://github.com/marithetland/susCovONT 
+bash ./susCovONT/scripts/install.sh $INSTALL_DIR
+```
+
+## Basic usage
 
 ```
 python susCovONT.py --input_dir /path/to/<run_name> --sample_names sample_names.csv
@@ -22,16 +31,6 @@ NB03,V2345678_P1
 ```
 
 Note: Basecalling and demultiplexing may also be performed if not already done on GridION/MinIT.
-
-## Quick install
-All necessary tools can be installed with the `./scripts/install.sh` script. You need to set the path of INSTALL_DIR, which is where the repositories will be installed (including this one), and you need to have conda and docker installed:
-
-```
-INSTALL_DIR="/home/marit/Programs/"  #Change to your install dir
-cd $INSTALL_DIR
-git clone https://github.com/marithetland/susCovONT  #Clone this repo
-bash ./susCovONT/scripts/install.sh $INSTALL_DIR #Install all necessary tools
-```
 
 ## Please see the wiki for more information:
 * [What does the pipeline do?](https://github.com/marithetland/covid-genomics/wiki/What-does-it-do%3F)
