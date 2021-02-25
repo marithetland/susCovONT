@@ -247,7 +247,7 @@ def check_input(args):
     ## Check that the input dir exists and set output dir
     #TODO: Set output dir option other than input dir
     if not args.input_dir.is_dir():
-        sys.exit('Error: {} is not a directory'.format(args.in_dir))
+        sys.exit('Error: {} is not a directory'.format(args.input_dir))
 
     if args.input_dir.is_dir():
         outdir = os.path.abspath(args.input_dir)
