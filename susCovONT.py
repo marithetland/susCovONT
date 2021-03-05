@@ -324,14 +324,14 @@ def check_input(args):
         else:
             fastq_pass_path=fastq_pass_undem
             fastq_pass_dem_path=fastq_pass_dem
-            sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt") 
+            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt") 
 
     ##If demultiplexing but not basecalling
     if args.barcode_kit and not args.basecalling_model:
         #If basecalling not specified, then the basecalled fastq folder must already exist
         if os.path.exists(fastq_pass_undem):
             fastq_pass_path=fastq_pass_undem
-            sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt")
+            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt")
             fastq_pass_dem_path=fastq_pass_dem
         elif os.path.exists(fastq_pass):
             fastq_pass_dem_path=fastq_pass
@@ -575,7 +575,7 @@ def main():
     pangolin_outfile=os.path.join(outdir,'004_pangolin/lineage_report.csv')
     nextclade_outdir=os.path.join(outdir,'005_nextclade/')
     nextclade_outfile=os.path.join(outdir,'005_nextclade/nextclade.csv')
-    final_report_name=os.path.join(outdir,'_report.csv')
+    final_report_name=os.path.join(outdir,run_name+'_report.csv')
 
     ##Check with user that the input is correct
     logging.info("##########CHECKPOINT##########")
