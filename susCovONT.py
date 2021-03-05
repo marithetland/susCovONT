@@ -296,15 +296,26 @@ def check_input(args):
                 sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt") 
                 fastq_pass_path=fastq_pass_undem
             elif not os.path.exists(fastq_pass_undem):
-                sequencing_summary=(outdir+"sequencing_summary*.txt") 
                 fastq_pass_path=fastq_pass_dem
+                if os.path.exists(os.path.join(fastq_pass_dem,"sequencing_summary.txt")):
+                    sequencing_summary=(os.path.join(fastq_pass_dem,"sequencing_summary.txt"))
+                else:
+                    sequencing_summary=(outdir+"sequencing_summary*.txt")
+                    seq_summary=os.path.abspath(sequencing_summary)
+                    seq_summary_exist2=[os.path.abspath(x) for x in glob.glob(sequencing_summary)]
+                    sequencing_summary=listToString(seq_summary_exist2)
             else:
                 sys.exit('Error: Could not find sequencing_summary.txt file to match ' + fastq_pass_dem)
         elif os.path.exists(fastq_pass):
             #If already basecalled AND demultiplexed on the GridION/MinIT:
             fastq_pass_path=fastq_pass
             fastq_pass_dem_path=fastq_pass
-            sequencing_summary=(outdir+"sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
+            sequencing_summary=(os.path.join(fastq_pass,"sequencing_summary.txt"))
+            if not os.path.exists(sequencing_summary):
+                sequencing_summary=(outdir+"sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
+                seq_summary=os.path.abspath(sequencing_summary)
+                seq_summary_exist2=[os.path.abspath(x) for x in glob.glob(sequencing_summary)]
+                sequencing_summary=listToString(seq_summary_exist2)
     ##IF demultiplexing
     if args.barcode_kit:
         #Check that there isn't already a folder called fastq_pass_demultiplexed
@@ -324,14 +335,14 @@ def check_input(args):
         else:
             fastq_pass_path=fastq_pass_undem
             fastq_pass_dem_path=fastq_pass_dem
-            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt") 
+            sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt") 
 
     ##If demultiplexing but not basecalling
     if args.barcode_kit and not args.basecalling_model:
         #If basecalling not specified, then the basecalled fastq folder must already exist
         if os.path.exists(fastq_pass_undem):
             fastq_pass_path=fastq_pass_undem
-            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt")
+            sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt")
             fastq_pass_dem_path=fastq_pass_dem
         elif os.path.exists(fastq_pass):
             fastq_pass_dem_path=fastq_pass
@@ -342,9 +353,8 @@ def check_input(args):
     #Check that the specified sequencing summary actually exists
     if not args.basecalling_model or not args.barcode_kit:
         if not args.seq_sum_file:
-            seq_summary_exist2=[os.path.abspath(x) for x in glob.glob(sequencing_summary)]
-            seq_summary=listToString(seq_summary_exist2)
-        elif args.seq_sum_file:
+            seq_summary=os.path.abspath(sequencing_summary)
+        if args.seq_sum_file:
             seq_summary=os.path.abspath(args.seq_sum_file)
         if not os.path.exists(seq_summary):
             sys.exit('Error: {} is not a file, or multiple sequence summary files were found. Please specify the full path with --seq_sum_file flag.'.format(seq_summary))
