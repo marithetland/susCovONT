@@ -158,7 +158,7 @@ def check_versions(conda_location,nf_dir_location,full_path):
         sys.exit('Error: Python 3.5 or greater is required')
 
     #check_nextflow_version():
-    nextflow_version = run_command(['echo -n "nextflow \t" >> ',full_path,'/pipeline_versions.txt ; nextflow -version | grep version >> ',full_path,'/pipeline_versions.txt'], shell=True)     ##Check that version is correct
+    nextflow_version = run_command(['echo "nextflow \t" >> ',full_path,'/pipeline_versions.txt ; nextflow -version | grep version >> ',full_path,'/pipeline_versions.txt'], shell=True)     ##Check that version is correct
     current_version ="      version 20.10.0 build 5430"
     try:
         if nextflow_version == current_version:
@@ -168,7 +168,7 @@ def check_versions(conda_location,nf_dir_location,full_path):
     return
 
     #check_artic_version(conda_location):
-    run_command(['echo -n "artic \t" >> ',full_path,'/pipeline_versions.txt ; ',conda_location,'/artic-2c6f8ebeb615d37ee3372e543ec21891/bin/artic --version >> ',full_path,'/pipeline_versions.txt'], shell=True) ##Check for empty results, skip
+    run_command(['echo "artic \t" >> ',full_path,'/pipeline_versions.txt ; ',conda_location,'/artic-2c6f8ebeb615d37ee3372e543ec21891/bin/artic --version >> ',full_path,'/pipeline_versions.txt'], shell=True) ##Check for empty results, skip
     pass
 
 # def check_pangolin_version():
@@ -446,7 +446,7 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,d
                      '\' --output-csv \'/seq/nextclade.csv\' '
                      ' --jobs=',str(cpus),' ; '
                      'mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,
-                     ' &>> ',nextclade_outdir,'nextclade_log.txt ']
+                     ' & >> ',nextclade_outdir,'nextclade_log.txt ']
     
     print(combineCommand(nextclade_command))
     return nextclade_command
