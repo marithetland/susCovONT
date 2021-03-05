@@ -338,7 +338,7 @@ def check_input(args):
             sequencing_summary=(outdir+"sequencing_summary*.txt")
         else:
             sys.exit("Error: Did not find a fastq_pass folder in {}/fastq_pass or {}/001_rawData/fastq_pass. Have you basecalled your fast5s or did you forget to specify basecalling (--basecalling_model)?").format(str(outdir))
-    
+
     #Check that the specified sequencing summary actually exists
     if not args.basecalling_model or not args.barcode_kit:
         if not args.seq_sum_file:
@@ -348,7 +348,9 @@ def check_input(args):
             seq_summary=os.path.abspath(args.seq_sum_file)
         if not os.path.exists(seq_summary):
             sys.exit('Error: {} is not a file, or multiple sequence summary files were found. Please specify the full path with --seq_sum_file flag.'.format(seq_summary))
-    
+    elif args.basecalling_model and args.barcode_kit:
+        seq_summary=os.path.abspath(sequencing_summary)
+
     #Check sample file and get df
     sample_df=get_sample_names(args.sample_names)
 
