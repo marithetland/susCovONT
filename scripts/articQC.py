@@ -144,7 +144,7 @@ def go(args):
         num_Ns = get_N_bases(fasta) 
 
     	# QC PASS / FAIL
-        if largest_N_gap >= 10000 and pct_N_bases < 10.0:
+        if largest_N_gap >= 10000 and pct_N_bases < 3.0:
                 qc_pass = "TRUE"
 
 
