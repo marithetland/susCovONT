@@ -1,7 +1,7 @@
 # susCovONT
 
 **Pipeline to generate consensus.fasta files and identify pangolin lineage and nextstrain clade of Sars-CoV-2 genomes from ONT sequencing.**
-
+* [Updates](#Updates)
 
 This pipeline takes as input a folder with name `<run_name>` which contains the folders `fast5_pass` and `fastq_pass` and `sequencing_summary*.txt` from Sars-CoV-2 ONT sequencing together with a CSV-file which links barcode and sample name, and it [outputs consensus.fasta files](https://artic.network/ncov-2019/ncov2019-bioinformatics-sop.html) along with `<run_name>_report.csv` which includes [pangolin lineage](https://cov-lineages.org/pangolin.html), [nextstrain clade, mutations](https://clades.nextstrain.org/) and [QC](https://github.com/marithetland/susCovONT/wiki/3.-QC-and-parameters). 
 
@@ -44,7 +44,6 @@ Note: Basecalling and demultiplexing may also be performed if not already done o
 * [Setting up MinKNOW and RAMPART](https://github.com/marithetland/covid-genomics/wiki/5.-MinKNOW-and-RAMPART)
 * [Further exploration using the Nexctlade Web Application](https://github.com/marithetland/covid-genomics/wiki/Using-Nextclade-web-application)
 
-
 ## Note and thanks
 Please note that this script was created for use at Stavanger University Hospital, you may need to change it (specifically the `scripts/config.cfg` file) for it to work in your environment.
 
@@ -54,3 +53,8 @@ Many thanks to the artic, pangolin and nextclade developers for creating the pro
 
 ## Repo name
 This pipeline was created for the analysis of Sars-CoV-2 data from Oxford Nanopore Technologies (ONT) sequencing at Stavanger University Hospital (SUH/SUS). Hence the name, susCovONT: SUS + Covid-19 + ONT.
+
+## Updates
+- 2021-03-12: Updated the threshold for QC PASS from >90% of bases confidently called (with 20X reads) to >97%, based on GISAID and [FHI's](https://github.com/folkehelseinstituttet/fhi-ncov-seq-pipelines) recommendations.
+- ToDo: Merge guppy basecalling and demultiplexing commands to one to use same structure as ONT devices
+- ToDo: Considering increasing the normalise value and/or using medaka in workflow instead of nanopolish
