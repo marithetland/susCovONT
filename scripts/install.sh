@@ -103,8 +103,8 @@ docker pull nextstrain/nextclade
 ## Change config file
 echo "##### Updating paths in file ${INSTALL_DIR}/susCovONT/scripts/config.cfg"
 cd $INSTALL_DIR
-sed -i "s|nf_location = /home/marit/Programs/ncov2019-artic-nf/|nf_location = ${INSTALL_DIR}/ncov2019-artic-nf/|" ${INSTALL_DIR}/susCovONT/scripts/config.cfg
-sed -i "s|conda_location = /home/marit/Programs/conda_for_covid/work/conda/|conda_location = ${INSTALL_DIR}/conda_for_covid/work/conda/|" ${INSTALL_DIR}/susCovONT/scripts/config.cfg
-sed -i "s|schemeRepoURL = /home/marit/Programs/primer-schemes/|schemeRepoURL = ${INSTALL_DIR}/primer-schemes/|" ${INSTALL_DIR}/susCovONT/scripts/config.cfg
+sed -i.bak "s|nf_location = /home/marit/Programs/ncov2019-artic-nf/|nf_location = ${INSTALL_DIR}/ncov2019-artic-nf/|" ${INSTALL_DIR}/susCovONT/scripts/config.cfg
+sed -i.bak "s|conda_location = /home/marit/Programs/conda_for_covid/work/conda/|conda_location = ${INSTALL_DIR}/conda_for_covid/work/conda/|" ${INSTALL_DIR}/susCovONT/scripts/config.cfg
+sed -i.bak "s|schemeRepoURL = /home/marit/Programs/primer-schemes/|schemeRepoURL = ${INSTALL_DIR}/primer-schemes/|" ${INSTALL_DIR}/susCovONT/scripts/config.cfg
 
 #Done
