@@ -26,13 +26,13 @@ import pandas as pd
 from functools import reduce
 from argparse import ArgumentParser
 import subprocess
-#from Bio import SeqIO
+from Bio import SeqIO
 import pathlib
 import collections
-#import dateutil.parser
-#import random
-#import statistics
-#import tempfile
+import dateutil.parser
+import random
+import statistics
+import tempfile
 from subprocess import call, check_output, CalledProcessError, STDOUT
 from pathlib import Path    
 from shutil import copyfile
