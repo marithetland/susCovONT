@@ -25,10 +25,12 @@ Where:
 * `--sample_names`: A CSV-file which connects barcodes with sample names, following the format:
 ```
 barcode,sample_name
-NB01,NEGCONTROL
-NB02,E1234567_P1
+barcode01,NEGCONTROL
+barcode02,E1234567_P1
 NB03,V2345678_P1
 ```
+The barcode column can take values following the format barcode[0-9][0-9] or NB[0-9][0-9] (as in the example above), and the sample_name column can be anything you'd like.
+
 
 Note: Basecalling and demultiplexing may also be performed if not already done on GridION/MinIT.
 
