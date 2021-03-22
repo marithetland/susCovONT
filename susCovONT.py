@@ -204,6 +204,14 @@ def set_config_variables(args):
     run_command([combineCommand(set_cpu_command)], shell=True)
     os.environ['NUMEXPR_MAX_THREADS'] = number_CPUs
 
+    #Set normalise value
+    normalise_value=str(args.normalise)
+    nanopore_file=(nf_dir_location+'conf/nanopore.config')
+    set_normalise_to=str("    normalise = "+normalise_value)
+    set_normalise_command = ["sed -i.bak '13s/.*/",set_normalise_to,
+                      "/' ",nanopore_file]
+    run_command([combineCommand(set_normalise_command)], shell=True)
+
     #Check if basecalling or demultiplexing is being performed and check that tools exist
     check_versions(conda_location,nf_dir_location,full_path)
 
