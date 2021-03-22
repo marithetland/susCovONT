@@ -23,6 +23,7 @@ import configparser
 import shutil
 import csv
 import pandas as pd
+import numpy as np
 from functools import reduce
 from argparse import ArgumentParser
 import subprocess
@@ -529,6 +530,9 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     mask = df_final_report.applymap(type) != bool
     d = {True: 'PASS', False: 'FAIL'}
     df_final_report = df_final_report.where(mask, df_final_report.replace(d))
+
+    #Add WARN if pct N is between 90 and 97:
+    df_final_report['QC_status'] = np.where(df_final_report['pct_covered_bases']>= 97.00, "PASS", (np.where(df_final_report['pct_covered_bases']>= 90.00, "WARN", "FAIL")))
 
     #Add WARN if nextclade report's overall QC is bad:
     df_final_report.loc[df_final_report.qc_overallStatus == 'bad', 'QC_status'] = "WARN"
