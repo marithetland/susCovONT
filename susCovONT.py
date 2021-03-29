@@ -596,7 +596,9 @@ def re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,df_final_report
         for barcode in re_normalise_list:
             print(barcode)
             #Run artic minion and move files to artic_outdir_renormalise
-            run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,artic_outdir_renormalise)
+            re_normalise_command=run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,artic_outdir_renormalise)
+            run_command([combineCommand(re_normalise_command)], shell=True)
+
             #Run QC script on consensus sequences in artic_outdir_renormalise
             qc_script=(nf_dir_location+'bin/qc.py')
             sample=(run_name+'_'+barcode)
@@ -614,6 +616,8 @@ def re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,df_final_report
                                    ' --outfile ', outfile,
                                    ' ; cat ', outfile, ' >> ', artic_qc]
             print(combineCommand(run_artic_QC_script))
+            run_command([combineCommand(run_artic_QC_script)], shell=True)
+
 
             #Run pangolin on updated consensus.fasta files
             #First combine all of the new *.consensus.fasta files to one:
@@ -756,7 +760,7 @@ def main():
         df_final_report = generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name)
     if not args.dry_run and not args.no_renormalise:
         renormalise_command=(re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,df_final_report,nf_outdir,args.cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, args.offline, args.dry_run))
-        #run_command([combineCommand(renormalise_command)], shell=True)
+        run_command([combineCommand(renormalise_command)], shell=True)
 
     #Move input files to 001_rawData directory
     if not args.no_move_files or not args.dry_run:
