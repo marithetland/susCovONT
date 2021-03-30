@@ -635,7 +635,7 @@ def re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,artic_qc,nf_out
                                    ' --bam ', bam,
                                    ' --ref ', ref,
                                    ' --outfile ', outfile,
-                                   ' ; cat ', outfile, ' >> ', artic_qc
+                                   ' ; cat ', outfile, ' >> ', artic_qc]
             print(combineCommand(run_artic_QC_script))
             run_command([combineCommand(run_artic_QC_script)], shell=True)
             #somehow combine QC from here with the one that already exists - replace lines?
@@ -750,7 +750,7 @@ def main():
         consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name) ##TODO:FIX mkdir
     
     #Re-run samples with QC_status WARN and update qc file + consensus dir
-    if not args.dry_run and not args.no_renormalise and not args.generate_report_only :
+    if not args.dry_run and not args.no_renormalise: #TODO ADD: and not args.generate_report_only :
         re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,artic_qc,nf_outdir,args.cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, args.offline, args.dry_run, consensus_dir)
         consensus_file = copy_to_consensus(consensus_dir_WARN,artic_outdir,run_name) ##TODO:FIX mkdir
 
