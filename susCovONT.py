@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
-""" marit.hetland@outlook.com
-github marithetland, February 2021
-This is a pipeline to generate consensus.fasta files 
-and to identify pangolin lineage and nextstrain clade of 
-Sars-CoV-2 genomes from ONT sequencing.
-Can also perform guppy basecalling and demultiplexing.
-It uses the ARTIC minion pipeline via PHW's Nextflow pipeline. 
-Currently tested with versions
-- Guppy basecalling software: Version 4.4.1
-- Nextflow v.20.10.0
-- Artic v1.2.1
-- ncov nextflow pipeline last updated 23.12.2020 (https://github.com/connor-lab/ncov2019-artic-nf)
-"""
+#
+# Pipeline for SARS-CoV-2 genomes from ONT sequencing
+# to run artic guppyplex, artic minion,
+# QC, pangolin and nextclade to produce
+# consensus.fasta files and output report
+#
+# Author: Marit Hetland (marit.hetland@outlook.com)
+# Created: 2021-01-24
+#
+# Prerequisites:
+#	 biopython, pandas, numpy, nextflow v20+
+#
+#
+# Example command:
+'''
+python susCovONT.py -i /path/to/input_folder -s /path/to/sample_names.csv
+'''
 
-#import modules
+#Import modules
 import logging, time
 import glob
 import datetime
@@ -627,7 +631,7 @@ def re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,artic_qc,nf_out
             bam=(artic_outdir_renormalise+barcode+'.primertrimmed.rg.sorted.bam')
             ref=(schemeRepoURL+'nCoV-2019/V3/nCoV-2019.reference.fasta')
             outfile=(artic_outdir_renormalise+sample+'_articQC.py')
-            artic_qc=(artic_outdir_renormalise+run_name+'_articQC.py')
+            new_artic_qc=(artic_outdir_renormalise+run_name+'_articQC.py')
 
             run_artic_QC_script = ['python ', qc_script, 
                                    ' --nanopore --sample ', sample,
@@ -635,7 +639,7 @@ def re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,artic_qc,nf_out
                                    ' --bam ', bam,
                                    ' --ref ', ref,
                                    ' --outfile ', outfile,
-                                   ' ; cat ', outfile, ' >> ', artic_qc]
+                                   ' ; cat ', outfile, ' >> ', new_artic_qc]
             print(combineCommand(run_artic_QC_script))
             run_command([combineCommand(run_artic_QC_script)], shell=True)
             #somehow combine QC from here with the one that already exists - replace lines?
@@ -643,6 +647,11 @@ def re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,artic_qc,nf_out
         #Move re-normalised samples (with any QC status) to 003_consensusFasta
         print("Checkpoint1")
         copy_to_consensus(consensus_dir, artic_outdir_renormalise, run_name)
+
+        #Update the articQC file
+        df_artic_qc_WARN=pd.read_csv(new_artic_qc, sep=',', header=0, encoding='utf8', engine='python')
+        artic_qc=update_artic_QC(df_artic_qc,df_artic_qc_WARN,artic_outdir,run_name)
+
         return #re_normalise_command
 
 def run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,artic_outdir_renormalise):
@@ -659,6 +668,15 @@ def run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequenc
 
     print(combineCommand(re_normalise_command))
     return re_normalise_command
+
+def update_artic_QC(artic_qc,df_artic_qc_WARN,artic_outdir,run_name):
+    logging.info('Update artic_QC file with new normalise values')
+    cols = list(df_artic_qc.columns) 
+    df_artic_qc.loc[df_artic_qc.sample_name.isin(df_artic_qc_WARN.sample_name), cols] = df_artic_qc_WARN[cols]
+    df_artic_qc.to_csv(artic_qc)
+
+    #store in artic_outdir with name run_name_qc.txt
+    return artic_qc
 
 #main
 def main():    
@@ -768,7 +786,7 @@ def main():
         
     #Generate run report
     if not args.dry_run:
-        df_final_report = generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name)
+        generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name)
         #Make sure artic_qc df is corret input here - must merge to have a QC file for both original and new
         #THEN split between PASS and WARN in the 003 fasta directory 
 
