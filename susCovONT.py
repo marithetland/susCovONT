@@ -710,7 +710,6 @@ def update_artic_QC(df_artic_qc,df_artic_qc_WARN,artic_outdir,run_name,artic_fin
     #Read in dataframes
     df_artic_qc=pd.read_csv(df_artic_qc, sep=',', header=0, encoding='utf8', engine='python')
     df_artic_qc_WARN=pd.read_csv(df_artic_qc_WARN, sep=',', header=0, encoding='utf8', engine='python')
-    print(df_artic_qc_WARN)
 
     #Remove paths from bam and fasta
     df_artic_qc_WARN__bam =df_artic_qc_WARN['bam'].str.split('/').str[-1]
@@ -789,7 +788,7 @@ def main():
     if args.no_artic:
         pipeline_commmand += ['\n- run pangolin and nextclade on already completed artic run and generate an output report'] #TODO add check for existing run
     if args.renormalise=="on":
-        pipeline_commmand += ['\n- and will re-run artic minion on samples with QC_status WARN without --normalise parameter (use --renormalise off to turn this off)'] 
+        pipeline_commmand += ['\n- and will re-run artic minion on samples with QC_status WARN without --normalise parameter (use `--renormalise=off` to turn this off)'] 
     if args.generate_report_only:
         pipeline_commmand += ['\n- only (re)create output report from already completed pipeline run'] 
     if args.offline:
@@ -846,7 +845,7 @@ def main():
         
     #Generate run report
     if not args.dry_run:
-        if args.renormalise=="on":
+        if args.renormalise=="off":
             copyfile(artic_qc, artic_final_qc) #TODO: Add sample_name to file?
         generate_qc_report(run_name,artic_final_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name,consensus_dir,args.renormalise,str(args.normalise))
 
