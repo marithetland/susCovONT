@@ -538,25 +538,18 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     pangolin_df = pd.read_csv(pangolin_outfile, sep=',', header=0, encoding='utf8', engine='python')
 
     #Shorten filenames for nextclade and pangolin
-    if renormalise=="on":
-        nclade_df__seqName=nclade_df['seqName'].str.split('/').str[-3]
-        nclade_df.drop('seqName', inplace=True, axis=1)
-        nclade_df.insert(1, 'seqName' , nclade_df__seqName)
+    nclade_df__seqName=nclade_df['seqName'].str.split('/').str[-3]
+    nclade_df.drop('seqName', inplace=True, axis=1)
+    nclade_df.insert(0, 'run_barcode' , nclade_df__seqName)
+    pangolin_df__taxon=pangolin_df['taxon'].str.split('/').str[-3]
+    pangolin_df.drop('taxon', inplace=True, axis=1)
+    pangolin_df.insert(0, 'run_barcode' , pangolin_df__taxon)
 
-        pangolin_df__taxon=pangolin_df['taxon'].str.split('/').str[-3]
-        pangolin_df.drop('taxon', inplace=True, axis=1)
-        pangolin_df.insert(1, 'taxon' , pangolin_df__taxon)
-
-    ##
     artic_df['run_barcode'] = artic_df.loc[:, 'sample_name']
-    nclade_df['run_barcode_artic_nanop'] = nclade_df.loc[:, 'seqName']
-    pangolin_df['run_barcode_artic_nanop'] = pangolin_df.loc[:, 'taxon']
 
     #Get uniform "barcode" and "run" column for each of the dataframes so they can be merged.
     artic_df[['run', 'barcode']] =  artic_df.run_barcode.str.rsplit('_', 1, expand=True).rename(lambda x: f'col{x + 1}', axis=1)
-    nclade_df[['run_barcode', 'ARTIC','nanopolish']] = nclade_df['run_barcode_artic_nanop'].str.split('/', 3, expand=True)
     nclade_df[['run', 'barcode']] =  nclade_df.run_barcode.str.rsplit('_', 1, expand=True).rename(lambda x: f'col{x + 1}', axis=1)
-    pangolin_df[['run_barcode', 'ARTIC','nanopolish']] = pangolin_df['run_barcode_artic_nanop'].str.split('/', 3, expand=True)
     pangolin_df[['run', 'barcode']] =  pangolin_df.run_barcode.str.rsplit('_', 1, expand=True).rename(lambda x: f'col{x + 1}', axis=1)
 
     #Add normalise value to the artic fasta and bam file columns
@@ -577,7 +570,7 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     final_data_frames = [df_main_results, df_merged]
     df_final_report = reduce(lambda  left,right: pd.merge(left,right,on=['sample_name_x'], how='outer'), final_data_frames)
     #Deselect unneccessary columns
-    df_final_report = df_final_report.drop(['run_barcode_artic_nanop_y','run_barcode','barcode_check','ARTIC_y','nanopolish_y','run','run_barcode_artic_nanop_x','run_barcode_y','ARTIC_x','nanopolish_x','run_y','run_barcode_x','run_x_y','barcode_y'], axis=1)
+    df_final_report = df_final_report.drop(['run_barcode','barcode_check','run','run_barcode_y','run_y','run_barcode_x','run_x_y','barcode_y'], axis=1)
     df_final_report.insert(7, 'artic_QC', 'artic_QC:')
     df_final_report.insert(17, 'pangolin_report', 'pangolin_report:')
     df_final_report.insert(24, 'nextclade_report', 'nextclade_report:')
@@ -699,7 +692,7 @@ def re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoU
             writer.writeheader()
         for barcode in re_normalise_list:
             #Remove the WARN consensusfile from the 003_consensusFasta directory:
-            current_barcode_consensus=barcode+'.consensus.fasta'
+            current_barcode_consensus=consensus_dir+barcode+'.consensus.fasta'
             if os.path.exists(current_barcode_consensus):
                 os.remove(current_barcode_consensus)
             
@@ -735,16 +728,14 @@ def run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequenc
     """Running artic minion with --normalise 0 to attempt better genome coverage"""
     #Get barcode path
     barcode_path=os.path.join(nf_outdir,'articNcovNanopore_sequenceAnalysisNanopolish_articGuppyPlex/')
-    re_normalise_command = ['bash -c "source activate conda ; ']
-    # re_normalise_command = ['bash -c "source activate ',conda_location,
-    #                         'artic-2c6f8ebeb615d37ee3372e543ec21891 ; ']
+    
+    re_normalise_command = ['bash -c "source activate ',conda_location,'artic-2c6f8ebeb615d37ee3372e543ec21891 ; ',]
     re_normalise_command += ['artic minion --normalise 0 --threads ', str(cpu),
                             ' --scheme-directory ', schemeRepoURL,
                             ' --read-file ', barcode_path, barcode, '.fastq'
                             ' --fast5-directory ', fast5_pass_path,
                             ' --sequencing-summary ', sequencing_summary,
-                            ' nCoV-2019/V3 ', artic_outdir_renormalise,barcode,
-                            ' " & >> ',artic_outdir_renormalise,'artic_renormalise_log.txt ']
+                            ' nCoV-2019/V3 ', artic_outdir_renormalise,barcode,' " ']
 
     return re_normalise_command
 
@@ -870,7 +861,7 @@ def main():
         copy_to_consensus(consensus_dir,artic_outdir,run_name) 
     
     #Re-run samples with QC_status WARN and update qc file + consensus dir
-    if not args.dry_run and args.renormalise=="on" and not args.generate_report_only:
+    if args.renormalise=="on" and not args.dry_run and not args.generate_report_only:
         re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,args.cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, args.offline, args.dry_run, consensus_dir,artic_outdir,artic_final_qc,str(args.normalise),conda_location)
 
     ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
@@ -891,7 +882,6 @@ def main():
         if args.renormalise=="off":
             copyfile(artic_qc, artic_final_qc) #TODO: Add sample_name to file?
         generate_qc_report(run_name,artic_final_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name,consensus_dir,args.renormalise,str(args.normalise))
-
 
     #Move input files to 001_rawData directory
     if not args.no_move_files or not args.dry_run:
