@@ -64,7 +64,7 @@ def parse_args():
     """Set arguments"""
     #Version
     parser = ArgumentParser(description='susCovONT')
-    parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.0')
+    parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.1')
 
     #Argsgroups
     input_args = parser.add_argument_group('Input options (required)')
