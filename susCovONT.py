@@ -90,7 +90,7 @@ def parse_args():
     advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions.fault: off.')
     advanced_args.add_argument('--no_move_files', action='store_true', required=False, help='By default, the input fast5_pass and fastq_pass dirs will be moved to subdir 001_rawData. Use this flag if you do not want that')
     advanced_args.add_argument('--no_artic', action='store_true', required=False, help='Use this flag to run only pangolin and nextclade on an already completed artic nextflow (with same folder structure)')
-    advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="on", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default=on.')
+    advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="off", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default=on.')
     advanced_args.add_argument('--dry_run', action='store_true', required=False, help='Executes nothing. Prints the commands that would have been run in a non-dry run.')
     advanced_args.add_argument('--seq_sum_file', type=pathlib.Path, required=False, help='If the pipeline does not find the sequence sumamry file, you can specify it. Generally not needed.')
 
