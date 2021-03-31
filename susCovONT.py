@@ -632,7 +632,7 @@ def artic_qc_status(run_name,artic_qc):
     return df_artic_qc
 
 
-def re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, offline, dry_run, consensus_dir,artic_outdir, artic_final_qc,normalise_val):
+def re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, offline, dry_run, consensus_dir,artic_outdir, artic_final_qc,normalise_val,conda_location):
     """
     If a sequnce was given a WARNING due to coverage 90-97, re-run nextflow with normalise 0
     to see if that improves the sequence coverage. Updates the report as well
@@ -691,11 +691,12 @@ def re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoU
         
         return consensus_file
 
-def run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,artic_outdir_renormalise):
+def run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,artic_outdir_renormalise,conda_location):
     logging.info('Running artic minion with --normalise 0 to attempt better genome coverage: ')
     #Get barcode path
     barcode_path=os.path.join(nf_outdir,'articNcovNanopore_sequenceAnalysisNanopolish_articGuppyPlex/')
-    re_normalise_command = ['bash -c "source activate artic ; ',]
+    re_normalise_command = ['bash -c "source activate ',conda_location,
+                            'artic-2c6f8ebeb615d37ee3372e543ec21891 ; ',]
     re_normalise_command += ['artic minion --normalise 0 --threads ', str(cpu),
                             ' --scheme-directory ', schemeRepoURL,
                             ' --read-file ', barcode_path, barcode, '.fastq'
@@ -829,7 +830,7 @@ def main():
     
     #Re-run samples with QC_status WARN and update qc file + consensus dir
     if not args.dry_run and args.renormalise=="on": #TODO ADD: and not args.generate_report_only :
-        consensus_file=re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,args.cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, args.offline, args.dry_run, consensus_dir,artic_outdir,artic_final_qc,str(args.normalise))
+        consensus_file=re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,args.cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, args.offline, args.dry_run, consensus_dir,artic_outdir,artic_final_qc,str(args.normalise),conda_location)
 
     ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
     if not args.generate_report_only:        
