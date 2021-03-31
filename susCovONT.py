@@ -89,7 +89,7 @@ def parse_args():
     advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions.fault: off.')
     advanced_args.add_argument('--no_move_files', action='store_true', required=False, help='By default, the input fast5_pass and fastq_pass dirs will be moved to subdir 001_rawData. Use this flag if you do not want that')
     advanced_args.add_argument('--no_artic', action='store_true', required=False, help='Use this flag to run only pangolin and nextclade on an already completed artic nextflow (with same folder structure)')
-    advanced_args.add_argument('--no_renormalise', action='store_true', required=False, help='Do not re-run artic minion with normalise 0 for samples w 90-97% \coverage. Default: off.')
+    advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="on", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default=on.')
     advanced_args.add_argument('--dry_run', action='store_true', required=False, help='Executes nothing. Prints the commands that would have been run in a non-dry run.')
     advanced_args.add_argument('--seq_sum_file', type=pathlib.Path, required=False, help='If the pipeline does not find the sequence sumamry file, you can specify it. Generally not needed.')
 
@@ -308,7 +308,7 @@ def check_input(args):
         if os.path.exists(fastq_pass_dem):
             fastq_pass_dem_path=fastq_pass_dem
             if os.path.exists(fastq_pass_undem):
-                sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt") 
+                sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt") 
                 fastq_pass_path=fastq_pass_undem
             elif not os.path.exists(fastq_pass_undem):
                 fastq_pass_path=fastq_pass_dem
@@ -350,14 +350,14 @@ def check_input(args):
         else:
             fastq_pass_path=fastq_pass_undem
             fastq_pass_dem_path=fastq_pass_dem
-            sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt") 
+            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt") 
 
     ##If demultiplexing but not basecalling
     if args.barcode_kit and not args.basecalling_model:
         #If basecalling not specified, then the basecalled fastq folder must already exist
         if os.path.exists(fastq_pass_undem):
             fastq_pass_path=fastq_pass_undem
-            sequencing_summary=(fastq_pass_undem+"sequencing_summary.txt")
+            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt")
             fastq_pass_dem_path=fastq_pass_dem
         elif os.path.exists(fastq_pass):
             fastq_pass_dem_path=fastq_pass
@@ -378,6 +378,7 @@ def check_input(args):
 
     #Check sample file and get df
     sample_df=get_sample_names(args.sample_names)
+
 
     return run_name, outdir, fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, seq_summary, sample_df
 
@@ -428,7 +429,6 @@ def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_
     if offline:
         nextflow_command += ['--schemeRepoURL ', schemeRepoURL]  #add option for offline running
     #nextflow_command +=['2>&1 artic_log.txt']
-
     print(listToString(nextflow_command))
     return nextflow_command
 
@@ -482,7 +482,7 @@ def copy_to_consensus(consensus_dir, artic_outdir, run_name):
     consensus_file=outfilename
     return consensus_file
 
-def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name):
+def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name,consensus_dir,renormalise,normalise_val):
     logging.info('Generating run report for run '+run_name+' with QC, lineages and list of mutations')
     if not os.path.isfile(artic_qc):
         sys.exit('Error: {} is not a file. Please check your input.'.format(artic_qc))
@@ -508,6 +508,11 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     nclade_df[['run', 'barcode']] =  nclade_df.run_barcode.str.rsplit('_', 1, expand=True).rename(lambda x: f'col{x + 1}', axis=1)
     pangolin_df[['run_barcode', 'ARTIC','nanopolish']] = pangolin_df['run_barcode_artic_nanop'].str.split('/', 3, expand=True)
     pangolin_df[['run', 'barcode']] =  pangolin_df.run_barcode.str.rsplit('_', 1, expand=True).rename(lambda x: f'col{x + 1}', axis=1)
+
+    #Add normalise value to the artic fasta and bam file columns
+    if renormalise=="off":
+        original_normalise=('normalise_' + normalise_val + '__')
+        artic_df['fasta'] = original_normalise + artic_df['fasta'].astype(str)
 
     #Merge dataframes
     data_frames = [sample_df, artic_df, pangolin_df, nclade_df]
@@ -540,16 +545,54 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
 
     #Add WARN if pct N is between 90 and 97:
     df_final_report['QC_status'] = np.where(df_final_report['pct_covered_bases']>= 97.00, "PASS", (np.where(df_final_report['pct_covered_bases']>= 90.00, "WARN", "FAIL")))
-
     #Add WARN if nextclade report's overall QC is bad:
     df_final_report.loc[df_final_report.qc_overallStatus == 'bad', 'QC_status'] = "WARN"
+    #Add WARN if longest_no_run is under 10 000:
+    df_final_report.loc[df_final_report.longest_no_N_run < 10000, 'QC_status'] = "WARN"
+
     df_final_report.loc[df_final_report.qc_pass == 'FAIL', 'QC_status'] = "FAIL"
 
     #Write to outputfile
     pd.DataFrame.to_csv(df_final_report, final_report_name, sep=',', na_rep='.', index=False)    
     print("Run report written to file: " + final_report_name)
+    
+    split_consensusFasta(run_name, final_report_name,consensus_dir)
 
     return df_final_report
+
+
+def split_consensusFasta(run_name,final_report_name,consensus_dir): #TODO: Make more pythonic
+    #Get list of PASS and WARN from final report
+    df_artic_qc = pd.read_csv(final_report_name, sep=',', header=0, encoding='utf8', engine='python')
+    list_WARN=df_artic_qc.loc[df_artic_qc['QC_status'] == 'WARN', 'Barcode'] 
+    list_PASS=df_artic_qc.loc[df_artic_qc['QC_status'] == 'PASS', 'Barcode']
+    outfilename_WARN=(consensus_dir+run_name+'_sequences_WARN.fasta')
+    outfilename_PASS=(consensus_dir+run_name+'_sequences_PASS.fasta')
+
+    #Put PASS files in one file
+    cat_consensus_files(list_PASS, outfilename_PASS, consensus_dir, run_name)
+    #Put WARN files in one file
+    cat_consensus_files(list_WARN, outfilename_WARN, consensus_dir, run_name)
+
+    #Remove run_name_sequences.fasta file
+    outfilename_orig=os.path.join(consensus_dir,run_name+'_sequences.fasta')
+    if os.path.exists(outfilename_orig):
+        os.remove(outfilename_orig)
+
+    return
+
+def cat_consensus_files(list_genomes, outfilename, consensus_dir, run_name):
+    list_genomes_path=[]
+    for barcode in list_genomes:
+        barcode_path=(consensus_dir+run_name+'_'+barcode+'.consensus.fasta')
+        list_genomes_path += [barcode_path]
+    if list_genomes_path:
+        list_genomes_cat = ['cat ']
+        for filename in list_genomes_path:
+            list_genomes_cat += [filename, ' ']
+        list_genomes_cat += [' >> ', outfilename]
+        run_command([combineCommand(list_genomes_cat)], shell=True)
+    return
   
 def move_input_files(outdir,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_pass_dem_path):
     #Make 001_rawDAta if not exists
@@ -577,8 +620,6 @@ def move_input_files(outdir,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_
     if os.path.exists(dirpath) and os.path.isdir(dirpath):
         shutil.rmtree(dirpath)
 
-
-
 def artic_qc_status(run_name,artic_qc):
     df_artic_qc = pd.read_csv(artic_qc, sep=',', header=0, encoding='utf8', engine='python')
 
@@ -588,18 +629,17 @@ def artic_qc_status(run_name,artic_qc):
 
     #Add WARN if pct N is between 90 and 97:
     df_artic_qc['qc_pass'] = np.where(df_artic_qc['pct_covered_bases']>= 97.00, "PASS", (np.where(df_artic_qc['pct_covered_bases']>= 90.00, "WARN", "FAIL")))
-    print(df_artic_qc)
     return df_artic_qc
 
 
-def re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,artic_qc,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, offline, dry_run, consensus_dir):
+def re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, offline, dry_run, consensus_dir,artic_outdir, artic_final_qc,normalise_val):
     """
     If a sequnce was given a WARNING due to coverage 90-97, re-run nextflow with normalise 0
     to see if that improves the sequence coverage. Updates the report as well
     """
     #If QC_status is WARN, get the Barcode number:
     df_artic_qc=artic_qc_status(run_name,artic_qc)
-    re_normalise_list=df_artic_qc.loc[df_artic_qc['qc_pass'] == 'FAIL', 'sample_name'] #TODO: Change this to WARN, FAIL is only for testing purposes
+    re_normalise_list=df_artic_qc.loc[df_artic_qc['qc_pass'] == 'PASS', 'sample_name'] #TODO: Change this to WARN, FAIL is only for testing purposes
     
     #No genomes had WARN, complete pipeline.
     if re_normalise_list.empty == True:
@@ -607,14 +647,17 @@ def re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,artic_qc,nf_out
     
     #If any genomes had WARN, re-normalise them
     if re_normalise_list.empty == False:
-        if not os.path.exists(consensus_dir_WARN):
-            os.mkdir(consensus_dir_WARN)
         if not os.path.exists(artic_outdir_renormalise):
             os.mkdir(artic_outdir_renormalise)
-
         print("The following barcodes had QC_status WARN and will be re-aligned with --normalise 0:")
         for barcode in re_normalise_list:
             print(barcode)
+        new_artic_qc=os.path.join(artic_outdir_renormalise,run_name+'.qc.csv')
+        new_artic_qc_header = ['sample_name','N_bases','pct_N_bases','pct_covered_bases','longest_no_N_run','num_aligned_reads','fasta','bam','qc_pass']
+        with open(new_artic_qc, 'w') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames = new_artic_qc_header, delimiter = ',')
+            writer.writeheader()
+        for barcode in re_normalise_list:
             #Remove the WARN consensusfile from the 003_consensusFasta directory:
             current_barcode_consensus=barcode+'.consensus.fasta'
             if os.path.exists(current_barcode_consensus):
@@ -631,28 +674,22 @@ def re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,artic_qc,nf_out
             bam=(artic_outdir_renormalise+barcode+'.primertrimmed.rg.sorted.bam')
             ref=(schemeRepoURL+'nCoV-2019/V3/nCoV-2019.reference.fasta')
             outfile=(artic_outdir_renormalise+sample+'_articQC.py')
-            new_artic_qc=(artic_outdir_renormalise+run_name+'_articQC.py')
-
             run_artic_QC_script = ['python ', qc_script, 
                                    ' --nanopore --sample ', sample,
                                    ' --fasta ', fasta,
                                    ' --bam ', bam,
                                    ' --ref ', ref,
                                    ' --outfile ', outfile,
-                                   ' ; cat ', outfile, ' >> ', new_artic_qc]
-            print(combineCommand(run_artic_QC_script))
+                                   ' ; cat ', outfile, ' | grep -v "^sample_name" >> ', new_artic_qc]
             run_command([combineCommand(run_artic_QC_script)], shell=True)
-            #somehow combine QC from here with the one that already exists - replace lines?
-        #Sort out 003_consensusFasta
-        #Move re-normalised samples (with any QC status) to 003_consensusFasta
-        print("Checkpoint1")
-        copy_to_consensus(consensus_dir, artic_outdir_renormalise, run_name)
 
-        #Update the articQC file
-        df_artic_qc_WARN=pd.read_csv(new_artic_qc, sep=',', header=0, encoding='utf8', engine='python')
-        artic_qc=update_artic_QC(df_artic_qc,df_artic_qc_WARN,artic_outdir,run_name)
+        #Update the articQC file with new qc from renormalised samples
+        update_artic_QC(artic_qc,new_artic_qc,artic_outdir,run_name,artic_final_qc,re_normalise_list,normalise_val)
 
-        return #re_normalise_command
+        #Move re-normalised samples (with any QC status, assuming only PASS or WARN) to 003_consensusFasta
+        consensus_file=copy_to_consensus(consensus_dir, artic_outdir_renormalise, run_name)
+        
+        return consensus_file
 
 def run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,artic_outdir_renormalise):
     logging.info('Running artic minion with --normalise 0 to attempt better genome coverage: ')
@@ -666,17 +703,39 @@ def run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequenc
                             ' --sequencing-summary ', sequencing_summary,
                             ' nCoV-2019/V3 ', artic_outdir_renormalise,barcode,' "']
 
-    print(combineCommand(re_normalise_command))
     return re_normalise_command
 
-def update_artic_QC(artic_qc,df_artic_qc_WARN,artic_outdir,run_name):
+def update_artic_QC(df_artic_qc,df_artic_qc_WARN,artic_outdir,run_name,artic_final_qc,re_normalise_list,normalise_val):
     logging.info('Update artic_QC file with new normalise values')
-    cols = list(df_artic_qc.columns) 
-    df_artic_qc.loc[df_artic_qc.sample_name.isin(df_artic_qc_WARN.sample_name), cols] = df_artic_qc_WARN[cols]
-    df_artic_qc.to_csv(artic_qc)
+    #Read in dataframes
+    df_artic_qc=pd.read_csv(df_artic_qc, sep=',', header=0, encoding='utf8', engine='python')
+    df_artic_qc_WARN=pd.read_csv(df_artic_qc_WARN, sep=',', header=0, encoding='utf8', engine='python')
+    print(df_artic_qc_WARN)
 
-    #store in artic_outdir with name run_name_qc.txt
-    return artic_qc
+    #Remove paths from bam and fasta
+    df_artic_qc_WARN__bam =df_artic_qc_WARN['bam'].str.split('/').str[-1]
+    df_artic_qc_WARN__fasta =df_artic_qc_WARN['fasta'].str.split('/').str[-1]
+    #Update dataframe to be without bam and fasta paths
+    df_artic_qc_WARN.drop('fasta', inplace=True, axis=1)
+    df_artic_qc_WARN.insert(6, 'fasta' , df_artic_qc_WARN__fasta)
+    df_artic_qc_WARN.drop('bam', inplace=True, axis=1)
+    df_artic_qc_WARN.insert(7, 'bam' , df_artic_qc_WARN__bam)
+
+    #Remove rows that need to be updated from original df
+    df_artic_qc = df_artic_qc.loc[~df_artic_qc['sample_name'].isin(re_normalise_list)]
+    #Update fasta to state normalise value in original dataframe
+    original_normalise=('normalise_' + normalise_val + '__')
+    df_artic_qc['fasta'] = original_normalise + df_artic_qc['fasta'].astype(str)
+
+    #Update fasta to state normalise value in new dataframe
+    df_artic_qc_WARN['fasta'] = 'normalise_0__' + df_artic_qc_WARN['fasta'].astype(str)
+
+    #Then add the new rows to the old dataframe
+    df_artic_qc = df_artic_qc.append(df_artic_qc_WARN, ignore_index=True)
+    df_artic_qc.to_csv(artic_final_qc, index=False, mode='w+')
+
+    return 
+
 
 #main
 def main():    
@@ -702,10 +761,10 @@ def main():
     raw_data_path=os.path.join(outdir,'001_rawData/')
     nf_outdir=os.path.join(outdir,'002_articPipeline/')
     artic_outdir=os.path.join(outdir,'002_articPipeline/qc_pass_climb_upload/')
-    artic_outdir_renormalise=os.path.join(outdir,'002_articPipeline/re_normalise__0/')
+    artic_outdir_renormalise=os.path.join(outdir,'002_articPipeline/renormalise_0/')
     artic_qc=os.path.join(outdir,'002_articPipeline/'+run_name+'.qc.csv')
+    artic_final_qc=os.path.join(artic_outdir,run_name+'.qc.csv')
     consensus_dir=os.path.join(outdir,'003_consensusFasta/')
-    consensus_dir_WARN=os.path.join(outdir,'003_consensusFasta/QC_status_WARN')
     pangolin_outdir=os.path.join(outdir,'004_pangolin/')
     pangolin_outfile=os.path.join(outdir,'004_pangolin/lineage_report.csv')
     nextclade_outdir=os.path.join(outdir,'005_nextclade/')
@@ -726,9 +785,11 @@ def main():
     if args.barcode_kit:
         pipeline_commmand += ['\n- run demultiplexing with barcodes ', args.barcode_kit.lower()] 
     if not args.no_artic and not args.generate_report_only:
-        pipeline_commmand += ['\n- run the artic pipeline, pangolin and nextclade and generate an output report '] 
+        pipeline_commmand += ['\n- run the artic pipeline (with --normalise',str(args.normalise),'), pangolin and nextclade and generate an output report '] 
     if args.no_artic:
         pipeline_commmand += ['\n- run pangolin and nextclade on already completed artic run and generate an output report'] #TODO add check for existing run
+    if args.renormalise=="on":
+        pipeline_commmand += ['\n- and will re-run artic minion on samples with QC_status WARN without --normalise parameter (use --renormalise off to turn this off)'] 
     if args.generate_report_only:
         pipeline_commmand += ['\n- only (re)create output report from already completed pipeline run'] 
     if args.offline:
@@ -768,9 +829,8 @@ def main():
         consensus_file = copy_to_consensus(consensus_dir,artic_outdir,run_name) ##TODO:FIX mkdir
     
     #Re-run samples with QC_status WARN and update qc file + consensus dir
-    if not args.dry_run and not args.no_renormalise: #TODO ADD: and not args.generate_report_only :
-        re_run_warn_seqs(artic_outdir_renormalise,consensus_dir_WARN,artic_qc,nf_outdir,args.cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, args.offline, args.dry_run, consensus_dir)
-        consensus_file = copy_to_consensus(consensus_dir_WARN,artic_outdir,run_name) ##TODO:FIX mkdir
+    if not args.dry_run and args.renormalise=="on": #TODO ADD: and not args.generate_report_only :
+        consensus_file=re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,args.cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, args.offline, args.dry_run, consensus_dir,artic_outdir,artic_final_qc,str(args.normalise))
 
     ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
     if not args.generate_report_only:        
@@ -786,9 +846,10 @@ def main():
         
     #Generate run report
     if not args.dry_run:
-        generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name)
-        #Make sure artic_qc df is corret input here - must merge to have a QC file for both original and new
-        #THEN split between PASS and WARN in the 003 fasta directory 
+        if args.renormalise=="on":
+            copyfile(artic_qc, artic_final_qc) #TODO: Add sample_name to file?
+        generate_qc_report(run_name,artic_final_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name,consensus_dir,args.renormalise,str(args.normalise))
+
 
     #Move input files to 001_rawData directory
     if not args.no_move_files or not args.dry_run:
