@@ -745,8 +745,8 @@ def main():
     nf_dir_location, conda_location, schemeRepoURL = set_config_variables(args)
 
     ##Check input and set variables
-    run_name, outdir, fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, sequencing_summary, sample_df = check_input(args)
-    
+    run_name, outdir, fast5_pass_path, fastq_pass_path, sequencing_summary, sample_df = check_input(args)
+
     ##Set output subdirectories
     #outdir=outdir #TODO:Set optional (parental) outdir
     raw_data_path=os.path.join(outdir,'001_rawData/')
@@ -805,7 +805,7 @@ def main():
 
     #Artic guppyplex and artic minion via PHW's nextflow pipeline
     if not args.generate_report_only and not args.no_artic:
-        nextflow_command=(get_nextflow_command(fastq_pass_dem_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
+        nextflow_command=(get_nextflow_command(fastq_pass_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
         if not args.dry_run and not args.generate_report_only:
             run_command([listToString(nextflow_command)], shell=True)
 
@@ -838,7 +838,7 @@ def main():
 
     #Move input files to 001_rawData directory
     if not args.no_move_files or not args.dry_run:
-        move_input_files(outdir,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_pass_dem_path)
+        move_input_files(outdir,raw_data_path)
 
     #Pipeline complete
     total_time = time.time() - start_time
