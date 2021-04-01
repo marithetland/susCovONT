@@ -1,0 +1,4 @@
+Pipeline versions 
+
+nextflow 	
+      version 20.10.0 build 5430

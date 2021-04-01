@@ -371,6 +371,7 @@ def check_input(args):
     return run_name, outdir, fast5_pass_path, fastq_pass_path, seq_summary, sample_df
 
 def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, barcode_kit, resume, cpu):
+    """Get the command used for running guppy basecaller"""
     basecalling_command = ['guppy_basecaller ',
                      '--input_path ', input_dir, 
                      '--recursive ',
@@ -584,7 +585,7 @@ def split_consensusFasta(run_name,final_report_name,consensus_dir): #TODO: Make 
     return
 
   
-def move_input_files(outdir,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_pass_dem_path):
+def move_input_files(outdir,raw_data_path):
     """At the end of the pipeline, move input dirs to subdir 001_rawData"""
     #Make 001_rawDAta if not exists
     if not os.path.isdir(raw_data_path):
