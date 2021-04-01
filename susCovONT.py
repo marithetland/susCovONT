@@ -739,6 +739,7 @@ def main():
     ##Set up log to stdout
     logfile = None
     logging.basicConfig(filename=logfile,level=logging.DEBUG,filemode='w',format='%(asctime)s %(message)s',datefmt='%m-%d-%Y %H:%M:%S')
+
     logging.info('Running susCovONT v.1.0.2') #Print program version
     logging.info('command line: {0}'.format(' '.join(sys.argv))) #Print input command
 
