@@ -51,11 +51,10 @@ BASECALLING = collections.OrderedDict([
 ])
 
 BARCODING = collections.OrderedDict([
-    ('native_1-12',  ['--arrangements_files "barcode_arrs_nb12.cfg "']),
-    ('native_13-24', ['--arrangements_files "barcode_arrs_nb24.cfg" ']),
-    ('native_1-24',  ['--arrangements_files "barcode_arrs_nb12.cfg barcode_arrs_nb24.cfg" ']),
-    ('native_1-96',  ['--arrangements_files "barcode_arrs_nb96.cfg" ']),
-    #('rapid_1-12',   ['--barcode_kit "SQK-RBK004" --trim_barcodes ']),
+    ('native_1-12',  ['--barcode_kits', 'EXP-NBD104 ']),
+    ('native_13-24', ['--barcode_kits', 'EXP-NBD114 ']),
+    ('native_1-24',  ['--barcode_kits', 'EXP-NBD104 EXP-NBD114 ']),
+    ('native_1-96',  ['--barcode_kits', 'EXP-NBD196 ']),
     ('none',         [])
 ])
 
@@ -64,7 +63,7 @@ def parse_args():
     """Set arguments"""
     #Version
     parser = ArgumentParser(description='susCovONT')
-    parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.1')
+    parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.2')
 
     #Argsgroups
     input_args = parser.add_argument_group('Input options (required)')
@@ -74,8 +73,8 @@ def parse_args():
     #output_args = parser.add_argument_group('Output options (required)')
 
     #Input
-    input_args.add_argument('-i', '--input_dir', type=pathlib.Path, required=True, help='Input directory, which should contain "fast5_pass" directory fast5-files.')
-    input_args.add_argument('-s', '--sample_names', type=pathlib.Path, required=True, help='Provide a comma-separated list showing which barcode corresponds to which sample (for final report)')
+    input_args.add_argument('-i', '--input_dir', type=pathlib.Path, required=True, help='Input directory, which should contain "fast5_pass" directory with fast5-files.')
+    input_args.add_argument('-s', '--sample_names', type=pathlib.Path, required=True, help='Provide a comma-separated file showing which barcode corresponds to which sample (for final report)')
     
     #Options to perform basecalling and/or demultiplexing before running artic guppyplex and minion
     optional_args.add_argument('-b', '--basecalling_model', type=str, required=False, choices=["r9.4_fast","r9.4_hac","r10_fast","r10_hac"], help='Use flag to perform basecalling before running the artic pipeline. Indicate which basecalling mode to use. In most cases you want to use a HAC option.')
@@ -280,6 +279,7 @@ def check_input(args):
     ##Check that the fast5_pass folder with files (recursive) exists in the input dir
     fast5_pass=os.path.join(outdir,"fast5_pass/") 
     fast5_pass_alt=os.path.join(outdir,"001_rawData/fast5_pass/")
+
     if not os.path.exists(fast5_pass):
         if os.path.exists(fast5_pass_alt):
             len_fast5=fileCount(fast5_pass_alt, '.fast5')
@@ -299,84 +299,60 @@ def check_input(args):
     ##Check guppy parameters if basecalling/demultiplexing
     model_choices = list(BASECALLING.keys())
     barcode_choices = list(BARCODING.keys())
-    if args.basecalling_model:
+    if args.basecalling_model and args.barcode_kit:
         check_guppy_version(outdir)
         if args.basecalling_model not in model_choices:
             sys.exit('Error: valid --model choices are: {}'.format(join_with_or(model_choices)))
-    if args.barcode_kit:
-        check_guppy_version(outdir)
         if args.barcode_kit not in barcode_choices:
             sys.exit('Error: valid --barcodes choices are: {}'.format(join_with_or(barcode_choices)))
     
     ##Check FASTQ files
     #If not basecalling or demultiplexing, FASTQ files must be present for artic minion to run
-    fastq_pass=os.path.join(outdir,"fastq_pass") #FASTQ demultiplexed on ONT (guppy), stored in run_name dir
-    fastq_pass_undem=os.path.join(outdir,"001_rawData/fastq_pass_notDemultiplexed") #FASTQ PASS from guppy basecaller, not demultiplexed. Exists together with fastq_pass under 001_rawData/
-    fastq_pass_dem=os.path.join(outdir,"001_rawData/fastq_pass") #FASTQ PASS from guppy basecaller, demultiplexed
-    sequencing_summary=""
+    fastq_pass=os.path.join(outdir,"fastq_pass/") 
+    fastq_pass_alt=os.path.join(outdir,"001_rawData/fastq_pass/")
+    sequencing_summary="" #TODO: Remove this?
 
-    ##If not demultiplexing or basecalling:
-    if not args.barcode_kit and not args.basecalling_model:
+    if args.basecalling_model and not args.barcode_kit:
+        sys.exit("Error: Cannot perform basecalling and downstream artic analysis without demultiplexing. Please also specify --barcode_kit /-k in your command.")
+    if not args.basecalling_model and args.barcode_kit: 
+        sys.exit("Error: Cannot perform demultiplexing and downstream artic analysis without also basecalling. Please also specify --basecalling_model /-b in your command.")
+
+    if not args.basecalling_model and not args.barcode_kit:
+        #Do not perform basecalling and demultiplexing, proceed to artic nf
         #The fastq_pass folder must exist as we are running nextflow directly on this + fast5.
-        if os.path.exists(fastq_pass_dem):
-            fastq_pass_dem_path=fastq_pass_dem
-            if os.path.exists(fastq_pass_undem):
-                sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt") 
-                fastq_pass_path=fastq_pass_undem
-            elif not os.path.exists(fastq_pass_undem):
-                fastq_pass_path=fastq_pass_dem
-                if os.path.exists(os.path.join(fastq_pass_dem,"sequencing_summary.txt")):
-                    sequencing_summary=(os.path.join(fastq_pass_dem,"sequencing_summary.txt"))
+        if not os.path.exists(fastq_pass):
+            if os.path.exists(fastq_pass_alt):
+                len_fastq=fileCount(fastq_pass_alt, '.fastq')
+                if len_fastq != 0:
+                    fastq_pass_path=fastq_pass_alt
+                    sequencing_summary=(os.path.join(fastq_pass_alt,"sequencing_summary.txt"))
                 else:
-                    sequencing_summary=(outdir+"sequencing_summary*.txt")
+                    sys.exit('Error: Found no .fastq files. Please check that your input directory is correct or perform basecalling with -b and -k flags.')
+            else:
+                sys.exit('Error: {} is not a directory'.format(fastq_pass))
+        if os.path.exists(fastq_pass):
+            len_fastq=fileCount(fastq_pass, '.fastq')
+            if len_fastq != 0:
+                fastq_pass_path=fastq_pass
+                sequencing_summary=(os.path.join(fastq_pass,"sequencing_summary.txt"))
+                if not os.path.exists(sequencing_summary):
+                    sequencing_summary=(outdir+"sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
                     seq_summary=os.path.abspath(sequencing_summary)
                     seq_summary_exist2=[os.path.abspath(x) for x in glob.glob(sequencing_summary)]
                     sequencing_summary=listToString(seq_summary_exist2)
             else:
-                sys.exit('Error: Could not find sequencing_summary.txt file to match ' + fastq_pass_dem)
-        elif os.path.exists(fastq_pass):
-            #If already basecalled AND demultiplexed on the GridION/MinIT:
-            fastq_pass_path=fastq_pass
-            fastq_pass_dem_path=fastq_pass
-            sequencing_summary=(os.path.join(fastq_pass,"sequencing_summary.txt"))
-            if not os.path.exists(sequencing_summary):
-                sequencing_summary=(outdir+"sequencing_summary*.txt")  #TODO: split run name to the last two "_"s to get this name properly
-                seq_summary=os.path.abspath(sequencing_summary)
-                seq_summary_exist2=[os.path.abspath(x) for x in glob.glob(sequencing_summary)]
-                sequencing_summary=listToString(seq_summary_exist2)
-    ##IF demultiplexing
-    if args.barcode_kit:
-        #Check that there isn't already a folder called fastq_pass_demultiplexed
-        if os.path.exists(fastq_pass_dem):
-            sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform demultiplexing.'.format(str(fastq_pass_dem)))
+                sys.exit('Error: Found no .fastq files. Please check that your input directory is correct or perform basecalling with -b and -k flags.')
 
-    ##If basecalling (and therefore demultiplexing)
-    if args.basecalling_model and not args.barcode_kit:
-        sys.exit("Error: Cannot perform basecalling and downstream artic analysis without demultiplexing. Please also specify --barcode_kit /-k in your command.")
-    if args.barcode_kit and args.basecalling_model:
+    if args.basecalling_model and args.barcode_kit:
+        #Perform basecalling and demultiplexing in joint command
+        #The fastq_pass folder must not exist as it will be created
         if os.path.exists(fastq_pass):
             sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass)))
-        elif os.path.exists(fastq_pass_dem):
-            sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass_dem)))
-        elif os.path.exists(fastq_pass_undem):
-            sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass_undem)))
+        elif os.path.exists(fastq_pass_alt):
+            sys.exit('Error: The folder {} already exists. Please delete/move this folder if you want to perform basecalling.'.format(str(fastq_pass_alt)))
         else:
-            fastq_pass_path=fastq_pass_undem
-            fastq_pass_dem_path=fastq_pass_dem
-            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt") 
-
-    ##If demultiplexing but not basecalling
-    if args.barcode_kit and not args.basecalling_model:
-        #If basecalling not specified, then the basecalled fastq folder must already exist
-        if os.path.exists(fastq_pass_undem):
-            fastq_pass_path=fastq_pass_undem
-            sequencing_summary=(fastq_pass_undem+"/sequencing_summary.txt")
-            fastq_pass_dem_path=fastq_pass_dem
-        elif os.path.exists(fastq_pass):
-            fastq_pass_dem_path=fastq_pass
-            sequencing_summary=(outdir+"sequencing_summary*.txt")
-        else:
-            sys.exit("Error: Did not find a fastq_pass folder in {}/fastq_pass or {}/001_rawData/fastq_pass. Have you basecalled your fast5s or did you forget to specify basecalling (--basecalling_model)?").format(str(outdir))
+            fastq_pass_path=fastq_pass_alt
+            sequencing_summary=os.path.join(fastq_pass_alt,"sequencing_summary.txt")
 
     #Check that the specified sequencing summary actually exists
     if not args.basecalling_model or not args.barcode_kit:
@@ -392,44 +368,28 @@ def check_input(args):
     #Check sample file and get df
     sample_df=get_sample_names(args.sample_names)
 
+    return run_name, outdir, fast5_pass_path, fastq_pass_path, seq_summary, sample_df
 
-    return run_name, outdir, fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, seq_summary, sample_df
-
-def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, resume, cpu):
+def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, barcode_kit, resume, cpu):
     """Get the command used for running guppy basecaller"""
     basecalling_command = ['guppy_basecaller ',
                      '--input_path ', input_dir, 
                      '--recursive ',
+                     '--require_barcodes_both_ends ',
                      '--save_path ', save_dir]
     basecalling_command += BASECALLING[basecalling_model]
+    basecalling_command += BARCODING[barcode_kit]
     if cpu:
-        basecalling_command += ['--num_callers 6'] #change to auto / add option to use CPU or GPU with options
+        basecalling_command += [' --num_callers 6 '] #change to auto / add option to use CPU or GPU with options
     else:
-        basecalling_command += ['-x ', 'auto'] #change to auto / add option to use CPU or GPU with options
+        basecalling_command += [' -x ', 'auto '] #change to auto / add option to use CPU or GPU with options
 
     if resume:
-         basecalling_command += ['--resume']  #add option to resume
+         basecalling_command += [' --resume ']  #add option to resume
     
     print(listToString(basecalling_command))
     return basecalling_command
 
-def get_guppy_barcoder_command(input_dir, save_dir, barcode_kit,resume, cpu):
-    """Get the command used for running guppy barcoder (demultiplexing)"""
-    barcoding_command = ['guppy_barcoder ',
-                     '--require_barcodes_both_ends '
-                     '--input_path ', input_dir, 
-                     '--save_path ', save_dir]
-    barcoding_command += BARCODING[barcode_kit]
-    if cpu:
-        barcoding_command += ['--num_callers 6'] #change to auto / add option to use CPU or GPU with options
-    else:
-        barcoding_command += ['-x ', 'auto'] #change to auto / add option to use CPU or GPU with options
-
-    if resume:
-         barcoding_command += ['--resume']  #add option to resume
-    
-    print(listToString(barcoding_command))
-    return barcoding_command
 
 def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location,schemeRepoURL,offline):
     """Get the command used for running artic via nextflow"""
@@ -625,7 +585,7 @@ def split_consensusFasta(run_name,final_report_name,consensus_dir): #TODO: Make 
     return
 
   
-def move_input_files(outdir,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_pass_dem_path):
+def move_input_files(outdir,raw_data_path):
     """At the end of the pipeline, move input dirs to subdir 001_rawData"""
     #Make 001_rawDAta if not exists
     if not os.path.isdir(raw_data_path):
@@ -779,15 +739,16 @@ def main():
     ##Set up log to stdout
     logfile = None
     logging.basicConfig(filename=logfile,level=logging.DEBUG,filemode='w',format='%(asctime)s %(message)s',datefmt='%m-%d-%Y %H:%M:%S')
-    logging.info('Running susCovONT v.1.0.1') #Print program version
+
+    logging.info('Running susCovONT v.1.0.2') #Print program version
     logging.info('command line: {0}'.format(' '.join(sys.argv))) #Print input command
 
     ##Set config variables and check that required tools exist
     nf_dir_location, conda_location, schemeRepoURL = set_config_variables(args)
 
     ##Check input and set variables
-    run_name, outdir, fast5_pass_path, fastq_pass_path, fastq_pass_dem_path, sequencing_summary, sample_df = check_input(args)
-    
+    run_name, outdir, fast5_pass_path, fastq_pass_path, sequencing_summary, sample_df = check_input(args)
+
     ##Set output subdirectories
     #outdir=outdir #TODO:Set optional (parental) outdir
     raw_data_path=os.path.join(outdir,'001_rawData/')
@@ -839,20 +800,14 @@ def main():
 
     ###Run pipeline
     ##Guppy basecalling
-    if args.basecalling_model:
-        basecalling_command=(get_guppy_basecalling_command(fast5_pass_path, fastq_pass_path, args.basecalling_model.lower(), args.guppy_resume_basecalling, args.guppy_use_cpu))
+    if args.basecalling_model and args.barcode_kit:
+        basecalling_command=(get_guppy_basecalling_command(fast5_pass_path, fastq_pass_path, args.basecalling_model.lower(), args.barcode_kit.lower(), args.guppy_resume_basecalling, args.guppy_use_cpu))
         if not args.dry_run:
             run_command([listToString(basecalling_command)], shell=True)
-    
-    ##Guppy demultiplexing
-    if args.basecalling_model or args.barcode_kit:
-        demultiplexing_command=(get_guppy_barcoder_command(fastq_pass_path, fastq_pass_dem_path, args.barcode_kit.lower(), args.guppy_resume_basecalling, args.guppy_use_cpu))
-        if not args.dry_run:
-            run_command([listToString(demultiplexing_command)], shell=True)
-    
+
     #Artic guppyplex and artic minion via PHW's nextflow pipeline
     if not args.generate_report_only and not args.no_artic:
-        nextflow_command=(get_nextflow_command(fastq_pass_dem_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
+        nextflow_command=(get_nextflow_command(fastq_pass_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
         if not args.dry_run and not args.generate_report_only:
             run_command([listToString(nextflow_command)], shell=True)
 
@@ -885,7 +840,7 @@ def main():
 
     #Move input files to 001_rawData directory
     if not args.no_move_files or not args.dry_run:
-        move_input_files(outdir,raw_data_path,fast5_pass_path,fastq_pass_path,fastq_pass_dem_path)
+        move_input_files(outdir,raw_data_path)
 
     #Pipeline complete
     total_time = time.time() - start_time
