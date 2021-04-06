@@ -73,7 +73,7 @@ def get_pct_N_bases(fasta):
     return pct_N_bases
 
 def get_N_bases(fasta):
-   
+
     count_N = len(get_N_positions(fasta))
 
     return count_N
@@ -141,10 +141,10 @@ def go(args):
 
         pct_N_bases = get_pct_N_bases(fasta)
         largest_N_gap = get_largest_N_gap(fasta)
-        num_Ns = get_N_bases(fasta) 
+        num_Ns = get_N_bases(fasta)
 
     	# QC PASS / FAIL
-        if largest_N_gap >= 10000 and pct_N_bases < 10.0:
+        if pct_N_bases < 10.0:
                 qc_pass = "TRUE"
 
 
