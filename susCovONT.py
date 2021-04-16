@@ -637,6 +637,7 @@ def re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoU
     #No genomes had WARN, complete pipeline.
     if re_normalise_list.empty == True:
         print("No genomes had QC_status WARN")
+        copyfile(artic_qc, artic_final_qc) #copy the original file to final artic qc
     
     #If any genomes had WARN, re-normalise them
     if re_normalise_list.empty == False:
