@@ -245,7 +245,7 @@ def get_sample_names(sample_names):
         sample_df.columns=sample_df.columns.str.replace('sample_names', 'sample_name')  #Change sample_names to sample_name if exists
         #Check that necessary columns 'barcode' and 'sample_names' are present:
         if not 'barcode' in sample_df.columns:
-            sys.exit('Error: Could not find column "barode" in file {}.'.format(sample_names))
+            sys.exit('Error: Could not find column "barcode" in file {}.'.format(sample_names))
         if not 'sample_name' in sample_df.columns:
             sys.exit('Error: Could not find column "sample_name" in file {}.'.format(sample_names))
         #Make sure sample names are given correctly
