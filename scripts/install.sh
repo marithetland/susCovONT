@@ -100,6 +100,11 @@ echo "##### Pulling nextclade (uses docker)"
 cd $INSTALL_DIR
 docker pull nextstrain/nextclade
 
+## Download reference files for nextclade
+cd $INSTALL_DIR
+git clone https://github.com/nextstrain/nextclade.git
+
+
 ## Change config file
 echo "##### Updating paths in file ${INSTALL_DIR}/susCovONT/scripts/config.cfg"
 cd $INSTALL_DIR
