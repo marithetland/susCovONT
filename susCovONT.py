@@ -209,6 +209,7 @@ def set_config_variables(args):
     nf_dir_location=config['NF_LOCATION']['nf_location']
     conda_location=config['CONDA_LOCATION']['conda_location']
     schemeRepoURL=config['OFFLINE']['schemeRepoURL']
+    nextclade_refdir_location=config['NC_REF_LOCATION']['nc_ref_location']
     
     #Set CPU for nextflow
     number_CPUs=str(args.cpu)
@@ -230,7 +231,7 @@ def set_config_variables(args):
     #Check if basecalling or demultiplexing is being performed and check that tools exist
     check_versions(conda_location,nf_dir_location,full_path)
 
-    return nf_dir_location, conda_location, schemeRepoURL
+    return nf_dir_location, conda_location, schemeRepoURL, nextclade_refdir_location
 
 def get_sample_names(sample_names):
     """Check that the sample file exists and has correct format (try to edit if possible)"""
@@ -422,7 +423,7 @@ def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
     print(combineCommand(pangolin_command))
     return pangolin_command
 
-def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,dry_run):
+def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,dry_run,nextclade_refdir_location):
     """Get the command used for running nextclade"""
     consensus_base=(run_name+'_sequences.fasta')
     ##TODO: ADD --jobs=str(cpus) to command - check if works
@@ -430,17 +431,30 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,d
     if not Path(nextclade_outdir).is_dir():
         os.mkdir(nextclade_outdir)
     logging.info('Running nextclade with command: ')
+    get_nextclade_refs = []
     nextclade_command = []
     if not offline:
         nextclade_command = ['docker pull nextstrain/nextclade ;'] 
-    nextclade_command += ['docker run --rm -u 1000' #Note for some systems this is 1000, others 1001
+    get_nextclade_refs += ['cp ',nextclade_refdir_location,'reference.fasta ',consensus_dir,'reference.fasta ; '
+             'cp ',nextclade_refdir_location,'tree.json ',consensus_dir,'tree.json ; '
+             'cp ',nextclade_refdir_location,'qc.json ',consensus_dir,'qc.json ; '
+             'cp ',nextclade_refdir_location,'genemap.gff ',consensus_dir,'genemap.gff']
+
+    run_command([combineCommand(get_nextclade_refs)], shell=True) #Copy references for nextclade
+
+    nextclade_command += ['sudo docker run --rm -u 1000' #Note this is not always 1000, use 'id -u' to find correct id
                      ' --volume="',consensus_dir, 
-                     ':/seq"  nextstrain/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
-                     '\' --output-csv \'/seq/nextclade.csv\' '
+                     ':/seq"  nextstrain/nextclade nextclade --input-fasta \'/seq/',consensus_base,'\' '
+                     '--input-root-seq  \'/seq/reference.fasta\' '
+                     '--input-tree  \'/seq/tree.json\' '
+                     '--input-qc-config  \'/seq/qc.json\' '
+                     '--input-gene-map  \'/seq/genemap.gff\' '
+                     '--output-csv \'/seq/nextclade.csv\' '
                      ' --jobs=',str(cpus),' ; '
                      'mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,
-                     ' & >> ',nextclade_outdir,'nextclade_log.txt ']
-    
+                     ' & >> ',nextclade_outdir,'nextclade_log.txt  ; '
+                     'rm ',consensus_dir,'reference.fasta ',consensus_dir,'tree.json ',consensus_dir,'qc.json ',consensus_dir,'genemap.gff ;']
+
     print(combineCommand(nextclade_command))
     return nextclade_command
 
@@ -745,7 +759,7 @@ def main():
     logging.info('command line: {0}'.format(' '.join(sys.argv))) #Print input command
 
     ##Set config variables and check that required tools exist
-    nf_dir_location, conda_location, schemeRepoURL = set_config_variables(args)
+    nf_dir_location, conda_location, schemeRepoURL, nextclade_refdir_location = set_config_variables(args)
 
     ##Check input and set variables
     run_name, outdir, fast5_pass_path, fastq_pass_path, sequencing_summary, sample_df = check_input(args)
@@ -799,8 +813,8 @@ def main():
         if(yes_or_no('Would you like to run this pipeline? y/n: ')):
             break
 
-    ###Run pipeline
-    ##Guppy basecalling
+    ##Run pipeline
+    #Guppy basecalling
     if args.basecalling_model and args.barcode_kit:
         basecalling_command=(get_guppy_basecalling_command(fast5_pass_path, fastq_pass_path, args.basecalling_model.lower(), args.barcode_kit.lower(), args.guppy_resume_basecalling, args.guppy_use_cpu))
         if not args.dry_run:
@@ -829,7 +843,7 @@ def main():
 
     ##Nextclade lineage assignment and substitutions
     if not args.generate_report_only:
-        nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir,args.cpu,args.offline,args.dry_run))
+        nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir,args.cpu,args.offline,args.dry_run,nextclade_refdir_location))
         if not args.dry_run:
             run_command([combineCommand(nextclade_command)], shell=True)
         
