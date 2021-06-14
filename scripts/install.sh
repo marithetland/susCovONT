@@ -91,9 +91,9 @@ git clone https://github.com/artic-network/primer-schemes.git
 echo "##### Installing pangolin (uses conda)"
 cd $INSTALL_DIR
 git clone https://github.com/cov-lineages/pangolin.git
-cd ${INSTALL_DIR}/pangolin
-conda env create -f environment.yml
-bash -c "source activate pangolin ; conda activate pangolin ; python setup.py install ;conda deactivate"
+#cd ${INSTALL_DIR}/pangolin
+#conda env create -f environment.yml
+#bash -c "source activate pangolin ; conda activate pangolin ; python setup.py install ;conda deactivate"
 
 ## Pull nextclade image
 echo "##### Pulling nextclade (uses docker)"
@@ -111,5 +111,6 @@ cd $INSTALL_DIR
 sed -i.bak "s|nf_location = /home/marit/Programs/ncov2019-artic-nf/|nf_location = ${INSTALL_DIR}/ncov2019-artic-nf/|" ${INSTALL_DIR}/susCovONT/scripts/config.cfg
 sed -i.bak "s|conda_location = /home/marit/Programs/conda_for_covid/work/conda/|conda_location = ${INSTALL_DIR}/conda_for_covid/work/conda/|" ${INSTALL_DIR}/susCovONT/scripts/config.cfg
 sed -i.bak "s|schemeRepoURL = /home/marit/Programs/primer-schemes/|schemeRepoURL = ${INSTALL_DIR}/primer-schemes/|" ${INSTALL_DIR}/susCovONT/scripts/config.cfg
+sed -i.bak "s|nc_ref_location = /home/susamr/Programs/nextclade/data/sars-cov-2/|schemeRepoURL = ${INSTALL_DIR}/nextclade/data/sars-cov-2/|" ${INSTALL_DIR}/susCovONT/scripts/config.cfg
 
 #Done
