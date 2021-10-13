@@ -85,6 +85,9 @@ conda env create --prefix ${CONDA_LOCATION}/work/conda/artic-2c6f8ebeb615d37ee33
 echo "##### Downloading primer schemes for offline mode to ${INSTALL_DIR}/primer-schemes"
 cd $INSTALL_DIR
 git clone https://github.com/artic-network/primer-schemes.git
+cd ${INSTALL_DIR}/primer-schemes/nCoV-2019/V4
+cp SARS-CoV-2.reference.fasta nCoV-2019.reference.fasta
+cp SARS-CoV-2.scheme.bed nCoV-2019.scheme.bed
 ##Check that folder didn't exist and that it now does
 
 ## Install pangolin
@@ -99,10 +102,6 @@ bash -c "source activate pangolin ; conda activate pangolin ; python setup.py in
 echo "##### Pulling nextclade (uses docker)"
 cd $INSTALL_DIR
 docker pull nextstrain/nextclade
-
-## Download reference files for nextclade
-cd $INSTALL_DIR
-git clone https://github.com/nextstrain/nextclade.git
 
 ## Change config file
 echo "##### Updating paths in file ${INSTALL_DIR}/susCovONT/scripts/config.cfg"
