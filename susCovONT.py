@@ -63,7 +63,7 @@ def parse_args():
     """Set arguments"""
     #Version
     parser = ArgumentParser(description='susCovONT')
-    parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.2')
+    parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.3')
 
     #Argsgroups
     input_args = parser.add_argument_group('Input options (required)')
@@ -83,13 +83,14 @@ def parse_args():
     basecalling_args.add_argument('--guppy_use_cpu', action='store_true', required=False, help='This flag can be used with --basecalling to run on CPU instead of GPU. Will use 4 threads and 6 callers. Default: GPU -auto x.')
 
     #Advanced options
+    advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3'], help='Specify primer kit: Default V4, options V3 or V4.') #NEW
     advanced_args.add_argument('--normalise', type=int, default=500, required=False, help='Specify normalise value for artic minion. Default: 500')
     advanced_args.add_argument('--cpu', type=int, default=20, required=False, help='Specify cpus to use. Default: 20')
     advanced_args.add_argument('--generate_report_only', action='store_true', required=False, help='Do not run any tools, just (re)generate output report from already completed run. Default: off.')
     advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions.fault: off.')
     advanced_args.add_argument('--no_move_files', action='store_true', required=False, help='By default, the input fast5_pass and fastq_pass dirs will be moved to subdir 001_rawData. Use this flag if you do not want that')
     advanced_args.add_argument('--no_artic', action='store_true', required=False, help='Use this flag to run only pangolin and nextclade on an already completed artic nextflow (with same folder structure)')
-    advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="off", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default=on.')
+    advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="on", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default=on.')
     advanced_args.add_argument('--dry_run', action='store_true', required=False, help='Executes nothing. Prints the commands that would have been run in a non-dry run.')
     advanced_args.add_argument('--seq_sum_file', type=pathlib.Path, required=False, help='If the pipeline does not find the sequence sumamry file, you can specify it. Generally not needed.')
 
@@ -209,6 +210,7 @@ def set_config_variables(args):
     nf_dir_location=config['NF_LOCATION']['nf_location']
     conda_location=config['CONDA_LOCATION']['conda_location']
     schemeRepoURL=config['OFFLINE']['schemeRepoURL']
+    #nextclade_refdir_location=config['NC_REF_LOCATION']['nc_ref_location']
     
     #Set CPU for nextflow
     number_CPUs=str(args.cpu)
@@ -230,7 +232,7 @@ def set_config_variables(args):
     #Check if basecalling or demultiplexing is being performed and check that tools exist
     check_versions(conda_location,nf_dir_location,full_path)
 
-    return nf_dir_location, conda_location, schemeRepoURL
+    return nf_dir_location, conda_location, schemeRepoURL#, nextclade_refdir_location
 
 def get_sample_names(sample_names):
     """Check that the sample file exists and has correct format (try to edit if possible)"""
@@ -391,7 +393,7 @@ def get_guppy_basecalling_command(input_dir, save_dir, basecalling_model, barcod
     return basecalling_command
 
 
-def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location,schemeRepoURL,offline):
+def get_nextflow_command(primer_kit, demultiplexed_fastq, fast5_pass, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location,schemeRepoURL,offline):
     """Get the command used for running artic via nextflow"""
     #TODO: add option to specify run folder, cache and medaka options
     logging.info('Running artic guppyplex and artic minion via nextflow pipeline with command: ')
@@ -401,11 +403,13 @@ def get_nextflow_command(demultiplexed_fastq, fast5_pass, sequencing_summary,nf_
                      '--basecalled_fastq', demultiplexed_fastq, 
                      '--fast5_pass', fast5_pass,
                      '--sequencing_summary  ', sequencing_summary,
+                     '--schemeVersion ', primer_kit,
                      '--outdir ', nf_outdir]
     if offline:
         nextflow_command += ['--schemeRepoURL ', schemeRepoURL]  #add option for offline running
     #nextflow_command +=['2>&1 artic_log.txt']
     print(listToString(nextflow_command))
+    
     return nextflow_command
 
 def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
@@ -422,6 +426,7 @@ def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
     print(combineCommand(pangolin_command))
     return pangolin_command
 
+
 def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,dry_run):
     """Get the command used for running nextclade"""
     consensus_base=(run_name+'_sequences.fasta')
@@ -430,17 +435,28 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,d
     if not Path(nextclade_outdir).is_dir():
         os.mkdir(nextclade_outdir)
     logging.info('Running nextclade with command: ')
+    #get_nextclade_refs = []
     nextclade_command = []
     if not offline:
-        nextclade_command = ['docker pull nextstrain/nextclade ;'] 
-    nextclade_command += ['docker run --rm -u 1000' #Note for some systems this is 1000, others 1001
+        nextclade_command = ['docker pull nextstrain/nextclade ; '] 
+
+    nextclade_command += ['docker run --rm -u 1001' #Note this is not always 1000, use 'id -u' to find correct id
                      ' --volume="',consensus_dir, 
-                     ':/seq"  nextstrain/nextclade nextclade --input-fasta \'/seq/',consensus_base, 
-                     '\' --output-csv \'/seq/nextclade.csv\' '
+                     ':/seq" nextstrain/nextclade nextclade dataset get --name=sars-cov-2 --output-dir=seq/data/sars-cov-2 ; ']
+
+    nextclade_command += ['docker run --rm -u 1001' #Note this is not always 1000, use 'id -u' to find correct id
+                     ' --volume="',consensus_dir, 
+                     ':/seq" nextstrain/nextclade nextclade run' 
+                     ' --input-dataset=\'/seq/data/sars-cov-2\''
+                     ' --input-fasta \'/seq/',consensus_base,'\''
+                     ' --output-csv=\'/seq/nextclade.csv\''
+                     ' --output-dir=seq/data/nextclade'
                      ' --jobs=',str(cpus),' ; '
                      'mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,
-                     ' & >> ',nextclade_outdir,'nextclade_log.txt ']
-    
+                     ' & >> ',nextclade_outdir,'nextclade_log.txt ; '
+                     'mv ',consensus_dir,'data/nextclade ',nextclade_outdir]
+
+
     print(combineCommand(nextclade_command))
     return nextclade_command
 
@@ -533,7 +549,7 @@ def generate_qc_report(run_name,artic_qc,nextclade_outfile,pangolin_outfile,samp
     df_final_report = df_final_report.drop(['run_barcode','barcode_check','run','run_barcode_y','run_y','run_barcode_x','run_x_y','barcode_y'], axis=1)
     df_final_report.insert(7, 'artic_QC', 'artic_QC:')
     df_final_report.insert(17, 'pangolin_report', 'pangolin_report:')
-    df_final_report.insert(24, 'nextclade_report', 'nextclade_report:')
+    df_final_report.insert(30, 'nextclade_report', 'nextclade_report:')
 
     df_final_report.rename({'sample_name_x': 'Sample_name', 'run_x_x': 'Run', 'barcode_x': 'Barcode', 'qc_pass_x': 'QC_status', 'lineage_x': 'pangolin_lineage', 'clade_x': 'nextstrain_clade', 'totalAminoacidSubstitutions_x': 'TotalAminoacidSubstitutions', 'sample_name_y': 'sample_name', 'qc_pass_y': 'qc_pass', 'lineage_y': 'lineage', 'clade_y': 'clade', 'totalAminoacidSubstitutions_y': 'totalAminoacidSubstitutions', 'qc.overallStatus': 'qc_overallStatus'}, axis=1, inplace=True)
     
@@ -625,7 +641,7 @@ def artic_qc_status(run_name,artic_qc):
     return df_artic_qc
 
 
-def re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, offline, dry_run, consensus_dir,artic_outdir, artic_final_qc,normalise_val,conda_location):
+def re_run_warn_seqs(primer_kit, primer_kit_fasta, artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, offline, dry_run, consensus_dir,artic_outdir, artic_final_qc,normalise_val,conda_location):
     """
     If a sequnce was given a WARNING due to coverage 90-97, re-run nextflow with normalise 0
     to see if that improves the sequence coverage. Updates the report as well
@@ -658,7 +674,8 @@ def re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoU
                 os.remove(current_barcode_consensus)
             
             #Run artic minion and move files to artic_outdir_renormalise
-            re_normalise_command=run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,artic_outdir_renormalise,conda_location)
+            re_normalise_command=run_artic_minion(primer_kit,barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,artic_outdir_renormalise,conda_location)
+            #print(combineCommand(re_normalise_command))
             run_command([combineCommand(re_normalise_command)], shell=True)
 
             #Run QC script on consensus sequences in artic_outdir_renormalise
@@ -666,13 +683,13 @@ def re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoU
             sample=barcode
             fasta=(artic_outdir_renormalise+barcode+'.consensus.fasta')
             bam=(artic_outdir_renormalise+barcode+'.primertrimmed.rg.sorted.bam')
-            ref=(schemeRepoURL+'nCoV-2019/V3/nCoV-2019.reference.fasta')
+            ref=(schemeRepoURL+'nCoV-2019/'+str(primer_kit)+'/'+str(primer_kit_fasta))
             outfile=(artic_outdir_renormalise+sample+'_articQC.py')
             run_artic_QC_script = ['python ', qc_script, 
                                    ' --nanopore --sample ', sample,
                                    ' --fasta ', fasta,
                                    ' --bam ', bam,
-                                   ' --ref ', ref,
+                                   ' --ref ', str(ref),
                                    ' --outfile ', outfile,
                                    ' ; cat ', outfile, ' | grep -v "^sample_name" >> ', new_artic_qc]
             run_command([combineCommand(run_artic_QC_script)], shell=True)
@@ -685,7 +702,7 @@ def re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,cpu,schemeRepoU
         
         return
 
-def run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,artic_outdir_renormalise,conda_location):
+def run_artic_minion(primer_kit, barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,artic_outdir_renormalise,conda_location):
     """Running artic minion with --normalise 0 to attempt better genome coverage"""
     #Get barcode path
     barcode_path=os.path.join(nf_outdir,'articNcovNanopore_sequenceAnalysisNanopolish_articGuppyPlex/')
@@ -696,7 +713,8 @@ def run_artic_minion(barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_path,sequenc
                             ' --read-file ', barcode_path, barcode, '.fastq'
                             ' --fast5-directory ', fast5_pass_path,
                             ' --sequencing-summary ', sequencing_summary,
-                            ' nCoV-2019/V3 ', artic_outdir_renormalise,barcode,' " ']
+                            ' nCoV-2019/',primer_kit,' ', artic_outdir_renormalise,barcode,' " ']
+
 
     return re_normalise_command
 
@@ -737,14 +755,22 @@ def main():
     start_time = time.time()
     now = datetime.datetime.now()    
 
+    if args.primer_kit:
+        primer_kit = args.primer_kit
+        primer_kit_fasta = 'nCoV-2019.reference.fasta'
+    else:
+        primer_kit = 'V4'
+        primer_kit_fasta = 'SARS-CoV-2.reference.fasta'
+
     ##Set up log to stdout
     logfile = None
     logging.basicConfig(filename=logfile,level=logging.DEBUG,filemode='w',format='%(asctime)s %(message)s',datefmt='%m-%d-%Y %H:%M:%S')
 
-    logging.info('Running susCovONT v.1.0.2') #Print program version
+    logging.info('Running susCovONT v.1.0.3') #Print program version
     logging.info('command line: {0}'.format(' '.join(sys.argv))) #Print input command
 
     ##Set config variables and check that required tools exist
+    #nf_dir_location, conda_location, schemeRepoURL, nextclade_refdir_location = set_config_variables(args)
     nf_dir_location, conda_location, schemeRepoURL = set_config_variables(args)
 
     ##Check input and set variables
@@ -772,6 +798,7 @@ def main():
     print("Found fast5_pass directory with "+str(fileCount(fast5_pass_path, '.fast5'))+" fast5 files to analyse")
     print("Your barcodes are specified in: " + os.path.abspath(args.sample_names))
     print("And the sequencing summary txt file is: " + os.path.abspath(sequencing_summary))
+    print("The primer kit is: " + primer_kit)
 
     pipeline_commmand = ['The susCovONT pipeline will: ']
     if args.basecalling_model:
@@ -799,8 +826,8 @@ def main():
         if(yes_or_no('Would you like to run this pipeline? y/n: ')):
             break
 
-    ###Run pipeline
-    ##Guppy basecalling
+    ##Run pipeline
+    #Guppy basecalling
     if args.basecalling_model and args.barcode_kit:
         basecalling_command=(get_guppy_basecalling_command(fast5_pass_path, fastq_pass_path, args.basecalling_model.lower(), args.barcode_kit.lower(), args.guppy_resume_basecalling, args.guppy_use_cpu))
         if not args.dry_run:
@@ -808,9 +835,11 @@ def main():
 
     #Artic guppyplex and artic minion via PHW's nextflow pipeline
     if not args.generate_report_only and not args.no_artic:
-        nextflow_command=(get_nextflow_command(fastq_pass_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
+        nextflow_command=(get_nextflow_command(primer_kit, fastq_pass_path, fast5_pass_path, sequencing_summary,nf_outdir,run_name,nf_dir_location,conda_location, schemeRepoURL,args.offline))
         if not args.dry_run and not args.generate_report_only:
             run_command([listToString(nextflow_command)], shell=True)
+            if not os.path.exists(artic_outdir):
+                os.mkdir(artic_outdir)
 
     #Copy PASS and WARN consensus.fasta files to consensus_dir 003_consensusFasta
     if not args.dry_run and not args.generate_report_only:
@@ -818,7 +847,7 @@ def main():
     
     #Re-run samples with QC_status WARN and update qc file + consensus dir
     if args.renormalise=="on" and not args.dry_run and not args.generate_report_only:
-        re_run_warn_seqs(artic_outdir_renormalise,artic_qc,nf_outdir,args.cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, args.offline, args.dry_run, consensus_dir,artic_outdir,artic_final_qc,str(args.normalise),conda_location)
+        re_run_warn_seqs(primer_kit, primer_kit_fasta, artic_outdir_renormalise,artic_qc,nf_outdir,args.cpu,schemeRepoURL,fast5_pass_path,sequencing_summary,run_name,nf_dir_location, args.offline, args.dry_run, consensus_dir,artic_outdir,artic_final_qc,str(args.normalise),conda_location)
 
     ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
     if not args.generate_report_only:  
