@@ -57,6 +57,7 @@ Many thanks to the artic, pangolin and nextclade developers for creating the pro
 This pipeline was created for the analysis of Sars-CoV-2 data from Oxford Nanopore Technologies (ONT) sequencing at Stavanger University Hospital (SUH/SUS). Hence the name, susCovONT: SUS + Covid-19 + ONT.
 
 ## Updates
+- 2021-10-14: Added option for V3 or V4 primer schemes, default is now V4. Updated nextclade. Fixed output report.
 - 2021-04-01: Combined the guppy basecalling and demultiplexing commands to match command (and output file structure) used by GridION
 - 2021-03-31: Updated QC thresholds (see [QC and parameters](https://github.com/marithetland/susCovONT/wiki/3.-QC-and-parameters)) and added option for setting the `--normalise` value (default is `--normalise 500`) and also to automatically re-analyse samples that have 90-97% coverage without normalisng (`--renormalise=on`)
 - 2021-03-12: Updated the threshold for QC PASS from >90% of bases confidently called (with 20X reads) to >97%, based on GISAID and [FHI's](https://github.com/folkehelseinstituttet/fhi-ncov-seq-pipelines) recommendations.
