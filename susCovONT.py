@@ -63,7 +63,7 @@ def parse_args():
     """Set arguments"""
     #Version
     parser = ArgumentParser(description='susCovONT')
-    parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.3')
+    parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.4')
 
     #Argsgroups
     input_args = parser.add_argument_group('Input options (required)')
@@ -83,14 +83,14 @@ def parse_args():
     basecalling_args.add_argument('--guppy_use_cpu', action='store_true', required=False, help='This flag can be used with --basecalling to run on CPU instead of GPU. Will use 4 threads and 6 callers. Default: GPU -auto x.')
 
     #Advanced options
-    advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3'], help='Specify primer kit: Default V4, options V3 or V4.') #NEW
+    advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3','V4.1'], help='Specify primer kit: Default V4, options V3, V4 or V4.1.') #NEW
     advanced_args.add_argument('--normalise', type=int, default=500, required=False, help='Specify normalise value for artic minion. Default: 500')
     advanced_args.add_argument('--cpu', type=int, default=20, required=False, help='Specify cpus to use. Default: 20')
     advanced_args.add_argument('--generate_report_only', action='store_true', required=False, help='Do not run any tools, just (re)generate output report from already completed run. Default: off.')
     advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions.fault: off.')
     advanced_args.add_argument('--no_move_files', action='store_true', required=False, help='By default, the input fast5_pass and fastq_pass dirs will be moved to subdir 001_rawData. Use this flag if you do not want that')
     advanced_args.add_argument('--no_artic', action='store_true', required=False, help='Use this flag to run only pangolin and nextclade on an already completed artic nextflow (with same folder structure)')
-    advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="on", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default=on.')
+    advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="off", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default=off.')
     advanced_args.add_argument('--dry_run', action='store_true', required=False, help='Executes nothing. Prints the commands that would have been run in a non-dry run.')
     advanced_args.add_argument('--seq_sum_file', type=pathlib.Path, required=False, help='If the pipeline does not find the sequence sumamry file, you can specify it. Generally not needed.')
 
@@ -403,10 +403,11 @@ def get_nextflow_command(primer_kit, demultiplexed_fastq, fast5_pass, sequencing
                      '--basecalled_fastq', demultiplexed_fastq, 
                      '--fast5_pass', fast5_pass,
                      '--sequencing_summary  ', sequencing_summary,
+                     '--schemeRepoURL ', schemeRepoURL,
                      '--schemeVersion ', primer_kit,
                      '--outdir ', nf_outdir]
-    if offline:
-        nextflow_command += ['--schemeRepoURL ', schemeRepoURL]  #add option for offline running
+    #if offline:
+        #nextflow_command += ['--schemeRepoURL ', schemeRepoURL]  #add option for offline running
     #nextflow_command +=['2>&1 artic_log.txt']
     print(listToString(nextflow_command))
     
@@ -448,7 +449,7 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,d
                      ' --volume="',consensus_dir, 
                      ':/seq" nextstrain/nextclade nextclade run' 
                      ' --input-dataset=\'/seq/data/sars-cov-2\''
-                     ' --input-fasta \'/seq/',consensus_base,'\''
+                     ' --input-fasta=\'/seq/',consensus_base,'\''
                      ' --output-csv=\'/seq/nextclade.csv\''
                      ' --output-dir=seq/data/nextclade'
                      ' --jobs=',str(cpus),' ; '
@@ -757,9 +758,9 @@ def main():
 
     if args.primer_kit:
         primer_kit = args.primer_kit
-        primer_kit_fasta = 'nCoV-2019.reference.fasta'
+        primer_kit_fasta = 'SARS-CoV-2.reference.fasta'
     else:
-        primer_kit = 'V4'
+        primer_kit = 'V4.1'
         primer_kit_fasta = 'SARS-CoV-2.reference.fasta'
 
     ##Set up log to stdout
