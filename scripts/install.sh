@@ -84,10 +84,8 @@ conda env create --prefix ${CONDA_LOCATION}/work/conda/artic-2c6f8ebeb615d37ee33
 ## Download primer schemes to be used in offline mode
 echo "##### Downloading primer schemes for offline mode to ${INSTALL_DIR}/primer-schemes"
 cd $INSTALL_DIR
-git clone https://github.com/artic-network/primer-schemes.git
-cd ${INSTALL_DIR}/primer-schemes/nCoV-2019/V4
-cp SARS-CoV-2.reference.fasta nCoV-2019.reference.fasta
-cp SARS-CoV-2.scheme.bed nCoV-2019.scheme.bed
+git clone https://github.com/markus-soma/primer-schemes.git
+
 ##Check that folder didn't exist and that it now does
 
 ## Install pangolin
