@@ -63,7 +63,7 @@ def parse_args():
     """Set arguments"""
     #Version
     parser = ArgumentParser(description='susCovONT')
-    parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.4')
+    parser.add_argument('-v','--version', action='version', version='%(prog)s ' + 'v.1.0.5')
 
     #Argsgroups
     input_args = parser.add_argument_group('Input options (required)')
@@ -449,9 +449,9 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,d
                      ' --volume="',consensus_dir, 
                      ':/seq" nextstrain/nextclade nextclade run' 
                      ' --input-dataset=\'/seq/data/sars-cov-2\''
-                     ' --input-fasta=\'/seq/',consensus_base,'\''
+                     ' /seq/',consensus_base,''
                      ' --output-csv=\'/seq/nextclade.csv\''
-                     ' --output-dir=seq/data/nextclade'
+                     ' --output-all=seq/data/nextclade'
                      ' --jobs=',str(cpus),' ; '
                      'mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,
                      ' & >> ',nextclade_outdir,'nextclade_log.txt ; '
@@ -767,7 +767,7 @@ def main():
     logfile = None
     logging.basicConfig(filename=logfile,level=logging.DEBUG,filemode='w',format='%(asctime)s %(message)s',datefmt='%m-%d-%Y %H:%M:%S')
 
-    logging.info('Running susCovONT v.1.0.4') #Print program version
+    logging.info('Running susCovONT v.1.0.5') #Print program version
     logging.info('command line: {0}'.format(' '.join(sys.argv))) #Print input command
 
     ##Set config variables and check that required tools exist
