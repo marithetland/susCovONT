@@ -79,7 +79,12 @@ echo "##### Bear with us, this takes a little while..."
 cd $INSTALL_DIR
 CONDA_LOCATION=$(echo "${INSTALL_DIR}/conda_for_covid/") #Change this to match your system
 mkdir $CONDA_LOCATION
-conda env create --prefix ${CONDA_LOCATION}/work/conda/artic-2c6f8ebeb615d37ee3372e543ec21891 --file ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml
+if testcmd mamba ; then
+    echo "Found mamba, this will speed up the installation."
+    mamba env create --prefix ${CONDA_LOCATION}/work/conda/artic-2c6f8ebeb615d37ee3372e543ec21891 --file ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml
+else
+    conda env create --prefix ${CONDA_LOCATION}/work/conda/artic-2c6f8ebeb615d37ee3372e543ec21891 --file ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml
+fi
 
 ## Download primer schemes to be used in offline mode
 echo "##### Downloading primer schemes for offline mode to ${INSTALL_DIR}/primer-schemes"
@@ -93,7 +98,12 @@ echo "##### Installing pangolin (uses conda)"
 cd $INSTALL_DIR
 git clone https://github.com/cov-lineages/pangolin.git
 cd ${INSTALL_DIR}/pangolin
-conda env create -f environment.yml
+if testcmd mamba ; then
+    echo "Found mamba, this will speed up the installation."
+    mamba env create -f environment.yml
+else
+    conda env create -f environment.yml
+fi
 bash -c "source activate pangolin ; conda activate pangolin ; python setup.py install ;conda deactivate"
 
 ## Pull nextclade image
