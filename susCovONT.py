@@ -439,7 +439,7 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,d
     #get_nextclade_refs = []
     nextclade_command = []
     if not offline:
-        nextclade_command = ['docker pull nextstrain/nextclade ; '] 
+        nextclade_command = ['docker pull nextstrain/nextclade:1.11.0 ; ']
 
     nextclade_command += ['docker run --rm -u 1000' #Note this is not always 1000, use 'id -u' to find correct id
                      ' --volume="',consensus_dir, 
