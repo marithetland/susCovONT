@@ -69,12 +69,12 @@ esac
 ## Git clone artic nextflow pipeline
 echo "##### Cloning artic nextflow pipeline to ${INSTALL_DIR}/ncov2019-artic-nf"
 cd $INSTALL_DIR
-git clone https://github.com/connor-lab/ncov2019-artic-nf
-sed -i.bak 's/artic=1.1.3/artic=1.2.1/g' ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml #Change "1.2.1" to desired artic version
+git clone -b v1.3.0 https://github.com/connor-lab/ncov2019-artic-nf
+sed -i.bak 's/artic=1.1.3/artic=1.2.2/g' ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml #Change "1.2.1" to desired artic version
 cp ${INSTALL_DIR}/susCovONT/scripts/articQC.py ncov2019-artic-nf/bin/qc.py #Update the QC script with the one from this repository.
 
 ## Create conda env to use as --cache for nextflow pipeline
-echo "##### Creating conda environment with artic v1.2.1 (uses conda)"
+echo "##### Creating conda environment with artic v1.2.2 (uses conda)"
 echo "##### Bear with us, this takes a little while..."
 cd $INSTALL_DIR
 CONDA_LOCATION=$(echo "${INSTALL_DIR}/conda_for_covid/") #Change this to match your system
@@ -96,7 +96,7 @@ git clone https://github.com/markus-soma/primer-schemes.git
 ## Install pangolin
 echo "##### Installing pangolin (uses conda)"
 cd $INSTALL_DIR
-git clone https://github.com/cov-lineages/pangolin.git
+git clone -b v4.1.2 https://github.com/cov-lineages/pangolin.git
 cd ${INSTALL_DIR}/pangolin
 if testcmd mamba ; then
     echo "Found mamba, this will speed up the installation."
@@ -109,7 +109,7 @@ bash -c "source activate pangolin ; conda activate pangolin ; python setup.py in
 ## Pull nextclade image
 echo "##### Pulling nextclade (uses docker)"
 cd $INSTALL_DIR
-docker pull nextstrain/nextclade
+docker pull nextstrain/nextclade:1.11.0
 
 ## Change config file
 echo "##### Updating paths in file ${INSTALL_DIR}/susCovONT/scripts/config.cfg"
