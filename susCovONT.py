@@ -9,7 +9,7 @@
 # Created: 2021-01-24
 #
 # Prerequisites:
-#	 biopython, pandas, numpy, nextflow v20+
+#	 biopython, pandas, numpy, nextflow v20.01.0 - v21.10.6
 #
 #
 # Example command:
