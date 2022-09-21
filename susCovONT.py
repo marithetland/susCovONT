@@ -86,8 +86,9 @@ def parse_args():
     advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3','V4.1'], help='Specify primer kit: Default V4, options V3, V4 or V4.1.') #NEW
     advanced_args.add_argument('--normalise', type=int, default=500, required=False, help='Specify normalise value for artic minion. Default: 500')
     advanced_args.add_argument('--cpu', type=int, default=20, required=False, help='Specify cpus to use. Default: 20')
+    advanced_args.add_argument('--nextclade_ver', type=str, default="latest", required=False, help='Set nextstrain/nextclade version that will be pulled if online. Default: latest')
     advanced_args.add_argument('--generate_report_only', action='store_true', required=False, help='Do not run any tools, just (re)generate output report from already completed run. Default: off.')
-    advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions.fault: off.')
+    advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade (but see --nextclade_version) and pangoli each time it runs. Use this flag if you want to run offline with already installed versions.fault: off.')
     advanced_args.add_argument('--no_move_files', action='store_true', required=False, help='By default, the input fast5_pass and fastq_pass dirs will be moved to subdir 001_rawData. Use this flag if you do not want that')
     advanced_args.add_argument('--no_artic', action='store_true', required=False, help='Use this flag to run only pangolin and nextclade on an already completed artic nextflow (with same folder structure)')
     advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="off", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default=off.')
@@ -232,7 +233,7 @@ def set_config_variables(args):
     #Check if basecalling or demultiplexing is being performed and check that tools exist
     check_versions(conda_location,nf_dir_location,full_path)
 
-    return nf_dir_location, conda_location, schemeRepoURL#, nextclade_refdir_location
+    return nf_dir_location, conda_location, schemeRepoURL#, nextclad_refdir_location
 
 def get_sample_names(sample_names):
     """Check that the sample file exists and has correct format (try to edit if possible)"""
@@ -428,7 +429,7 @@ def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
     return pangolin_command
 
 
-def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,dry_run):
+def get_nextclade_command(run_name,consensus_dir,nextclade_version,nextclade_outdir,cpus,offline,dry_run):
     """Get the command used for running nextclade"""
     consensus_base=(run_name+'_sequences.fasta')
     ##TODO: ADD --jobs=str(cpus) to command - check if works
@@ -439,13 +440,13 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,d
     #get_nextclade_refs = []
     nextclade_command = []
     if not offline:
-        nextclade_command = ['docker pull nextstrain/nextclade:1.11.0 ; ']
+        nextclade_command = ['docker pull nextstrain/nextclade:'+nextclade_version+' ; ']
 
-    nextclade_command += ['docker run --rm -u 1000' #Note this is not always 1000, use 'id -u' to find correct id
+    nextclade_command += ['docker run --rm -u 0' #Note this is not always 1000, use 'id -u' to find correct id
                      ' --volume="',consensus_dir, 
                      ':/seq" nextstrain/nextclade nextclade dataset get --name=sars-cov-2 --output-dir=seq/data/sars-cov-2 ; ']
 
-    nextclade_command += ['docker run --rm -u 1000' #Note this is not always 1000, use 'id -u' to find correct id
+    nextclade_command += ['docker run --rm -u 0' #Note this is not always 1000, use 'id -u' to find correct id
                      ' --volume="',consensus_dir, 
                      ':/seq" nextstrain/nextclade nextclade run' 
                      ' --input-dataset=\'/seq/data/sars-cov-2\''
@@ -859,7 +860,7 @@ def main():
 
     ##Nextclade lineage assignment and substitutions
     if not args.generate_report_only:
-        nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir,args.cpu,args.offline,args.dry_run))
+        nextclade_command=(get_nextclade_command(run_name,consensus_dir,args.nextclade_ver,nextclade_outdir,args.cpu,args.offline,args.dry_run))
         if not args.dry_run:
             run_command([combineCommand(nextclade_command)], shell=True)
         
