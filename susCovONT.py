@@ -83,6 +83,7 @@ def parse_args():
     basecalling_args.add_argument('--guppy_use_cpu', action='store_true', required=False, help='This flag can be used with --basecalling to run on CPU instead of GPU. Will use 4 threads and 6 callers. Default: GPU -auto x.')
 
     #Advanced options
+    advanced_args.add_argument('-y', '--yes', action='store_true', help='Will run the pipeline non-interactively and give an automatic yes to all prompts.')
     advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3','V4.1'], help='Specify primer kit: Default V4, options V3, V4 or V4.1.') #NEW
     advanced_args.add_argument('--normalise', type=int, default=500, required=False, help='Specify normalise value for artic minion. Default: 500')
     advanced_args.add_argument('--cpu', type=int, default=20, required=False, help='Specify cpus to use. Default: 20')
@@ -148,9 +149,12 @@ def check_barcodeID(value, pattern=re.compile("barcode[0-9][0-9]")):
     """Check that barcode in sample_names follows the correct pattern"""
     return 'TRUE' if pattern.match(value) else 'FALSE'
     
-def yes_or_no(question):
-    """Ask user a yes/no question"""
-    reply = str(input(question+' (y/n): ')).lower().strip()
+def yes_or_no(question, automatic_yes):
+    """Ask user a yes/no question unless automatic yes is selected"""
+    if automatic_yes:
+        reply='yes'
+    else:
+        reply = str(input(question+' (y/n): ')).lower().strip()
     if reply[0] == 'y':
         print("Starting pipeline")
         return 1
@@ -826,7 +830,7 @@ def main():
     print(listToString(pipeline_commmand))
 
     while True:
-        if(yes_or_no('Would you like to run this pipeline? y/n: ')):
+        if(yes_or_no('Would you like to run this pipeline? y/n: ', args.yes)):
             break
 
     ##Run pipeline
