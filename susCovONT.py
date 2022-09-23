@@ -87,10 +87,11 @@ def parse_args():
     advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3','V4.1'], help='Specify primer kit: Default V4, options V3, V4 or V4.1.') #NEW
     advanced_args.add_argument('--normalise', type=int, default=500, required=False, help='Specify normalise value for artic minion. Default: 500')
     advanced_args.add_argument('--cpu', type=int, default=20, required=False, help='Specify cpus to use. Default: 20')
-    advanced_args.add_argument('--nextclade_ver', type=str, default="latest", required=False, help='Set nextstrain/nextclade version that will be pulled if online. Default: latest')
+    advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions. For more specific options see --nexclade_ver and --keep_pangolin_ver. Default: off.')
+    advanced_args.add_argument('--nextclade_ver', type=str, default="latest", required=False, help='Set nextstrain/nextclade version that will be pulled if online (see also --offline). Default: latest.')
+    advanced_args.add_argument('--keep_pangolin_ver', action='store_true', help='Will run the pipeline without updating pangolin (see also --offline). Default is updating pangolin.')
     advanced_args.add_argument('-u', '--user_id', type=int, default=1000, required=False, help='User id used to run docker commands, use "id -u" to find correct id. Default: 1000')
     advanced_args.add_argument('--generate_report_only', action='store_true', required=False, help='Do not run any tools, just (re)generate output report from already completed run. Default: off.')
-    advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade (but see --nextclade_version) and pangolin each time it runs. Use this flag if you want to run offline with already installed versions. Default: off.')
     advanced_args.add_argument('--no_move_files', action='store_true', required=False, help='By default, the input fast5_pass and fastq_pass dirs will be moved to subdir 001_rawData. Use this flag if you do not want that')
     advanced_args.add_argument('--no_artic', action='store_true', required=False, help='Use this flag to run only pangolin and nextclade on an already completed artic nextflow (with same folder structure)')
     advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="off", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default: off.')
@@ -152,7 +153,7 @@ def check_barcodeID(value, pattern=re.compile("barcode[0-9][0-9]")):
 def yes_or_no(question, automatic_yes):
     """Ask user a yes/no question unless automatic yes is selected"""
     if automatic_yes:
-        reply='yes'
+        reply='y'
     else:
         reply = str(input(question+' (y/n): ')).lower().strip()
     if reply[0] == 'y':
@@ -419,11 +420,11 @@ def get_nextflow_command(primer_kit, demultiplexed_fastq, fast5_pass, sequencing
     
     return nextflow_command
 
-def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
+def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline,keep_pangolin_ver):
     """Get the command used for running pangolin"""
     logging.info('Running pangolin with command: ')
     pangolin_command = ['bash -c "source activate pangolin ; ',]
-    if not offline:
+    if not (offline or keep_pangolin_ver):
         pangolin_command +=[' pangolin --update ; ',] #This takes approx 4 minutes, so consider turning off.
     pangolin_command += [' pangolin ', consensus_file,
                         ' --outdir ', pangolin_outdir,
@@ -859,13 +860,13 @@ def main():
     ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
     if not args.generate_report_only:  
         consensus_file=combine_consensus_files(consensus_dir, run_name)      
-        pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir,args.cpu,args.offline))
+        pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir,args.cpu,args.offline,args.keep_pangolin_ver))
         if not args.dry_run:    
             run_command([combineCommand(pangolin_command)], shell=True)
 
     ##Nextclade lineage assignment and substitutions
     if not args.generate_report_only:
-        nextclade_command=(get_nextclade_command(run_name,consensus_dir,args.nextclade_ver,nextclade_outdir,args.cpu,args.offline,args.dry_run, args.user_id))
+        nextclade_command=(get_nextclade_command(run_name,consensus_dir,args.nextclade_ver,nextclade_outdir,args.cpu,args.offline,args.dry_run,args.user_id))
         if not args.dry_run:
             run_command([combineCommand(nextclade_command)], shell=True)
         
