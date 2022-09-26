@@ -811,8 +811,11 @@ def main():
     print("Your barcodes are specified in: " + os.path.abspath(args.sample_names))
     print("And the sequencing summary txt file is: " + os.path.abspath(sequencing_summary))
     print("The primer kit is: " + primer_kit)
+    print("User id used for docker is: " + str(args.user_id))
 
     pipeline_commmand = ['The susCovONT pipeline will: ']
+    if args.yes:
+        pipeline_commmand += ['\n- run non-interactively and answer yes to all prompts']
     if args.basecalling_model:
         pipeline_commmand += ['\n- run basecalling with model', args.basecalling_model.lower()] 
     if args.barcode_kit:
@@ -826,7 +829,11 @@ def main():
     if args.generate_report_only:
         pipeline_commmand += ['\n- only (re)create output report from already completed pipeline run'] 
     if args.offline:
-        pipeline_commmand += ['\n- in offline mode'] 
+        pipeline_commmand += ['\n- in offline mode']
+    if not (args.offline and args.nextclade_ver=='latest'):
+        pipeline_commmand += ['\n- use nextclade version:',str(args.nextclade_ver)]
+    if args.keep_pangolin_ver:
+        pipeline_commmand += ['\n- keep (i.e. not update) the pangolin version']
     if args.dry_run:
         pipeline_commmand += ['\n- in dry mode (no execution of commands)'] 
     if not args.dry_run and not args.generate_report_only:
