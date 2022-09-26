@@ -450,11 +450,11 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_version,nextclade_out
 
     nextclade_command += ['docker run --rm -u {}'.format(user_id),
                      ' --volume="',consensus_dir, 
-                     ':/seq" nextstrain/nextclade nextclade dataset get --name=sars-cov-2 --output-dir=seq/data/sars-cov-2 ; ']
+                     ':/seq" nextstrain/nextclade:{} nextclade dataset get --name=sars-cov-2 --output-dir=seq/data/sars-cov-2 ; '.format(nextclade_version)]
 
     nextclade_command += ['docker run --rm -u {}'.format(user_id),
                      ' --volume="',consensus_dir, 
-                     ':/seq" nextstrain/nextclade nextclade run' 
+                     ':/seq" nextstrain/nextclade:{} nextclade run'.format(nextclade_version),
                      ' --input-dataset=\'/seq/data/sars-cov-2\''
                      ' /seq/',consensus_base,''
                      ' --output-csv=\'/seq/nextclade.csv\''
