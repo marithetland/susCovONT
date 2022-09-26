@@ -443,18 +443,22 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_version,nextclade_out
     if not Path(nextclade_outdir).is_dir():
         os.mkdir(nextclade_outdir)
     logging.info('Running nextclade with command: ')
+    if offline and nextclade_version=='latest':
+        nextclade_image = 'nextstrain/nextclade'
+    else:
+        nextclade_image = 'nextstrain/nextclade:{}'.format(nextclade_version)
     #get_nextclade_refs = []
     nextclade_command = []
     if not offline:
-        nextclade_command = ['docker pull nextstrain/nextclade:{} ; '.format(nextclade_version)]
+        nextclade_command = ['docker pull ',nextclade_image,' ; ']
 
-    nextclade_command += ['docker run --rm -u {}'.format(user_id),
-                     ' --volume="',consensus_dir, 
-                     ':/seq" nextstrain/nextclade:{} nextclade dataset get --name=sars-cov-2 --output-dir=seq/data/sars-cov-2 ; '.format(nextclade_version)]
+    nextclade_command += ['docker run --rm -u ',str(user_id),
+                     ' --volume="',consensus_dir,
+                     ':/seq" ',nextclade_image,' nextclade dataset get --name=sars-cov-2 --output-dir=seq/data/sars-cov-2 ; ']
 
-    nextclade_command += ['docker run --rm -u {}'.format(user_id),
+    nextclade_command += ['docker run --rm -u ',str(user_id),
                      ' --volume="',consensus_dir, 
-                     ':/seq" nextstrain/nextclade:{} nextclade run'.format(nextclade_version),
+                     ':/seq" ',nextclade_image,' nextclade run',
                      ' --input-dataset=\'/seq/data/sars-cov-2\''
                      ' /seq/',consensus_base,''
                      ' --output-csv=\'/seq/nextclade.csv\''
