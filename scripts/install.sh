@@ -109,7 +109,7 @@ bash -c "source activate pangolin ; conda activate pangolin ; python setup.py in
 ## Pull nextclade image
 echo "##### Pulling nextclade (uses docker)"
 cd $INSTALL_DIR
-docker pull nextstrain/nextclade:1.11.0
+docker pull nextstrain/nextclade:2.5.0
 
 ## Change config file
 echo "##### Updating paths in file ${INSTALL_DIR}/susCovONT/scripts/config.cfg"
