@@ -89,6 +89,7 @@ def parse_args():
     advanced_args.add_argument('--cpu', type=int, default=20, required=False, help='Specify cpus to use. Default: 20')
     advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions. For more specific options see --nexclade_ver and --keep_pangolin_ver. Default: off.')
     advanced_args.add_argument('--nextclade_ver', type=str, default="latest", required=False, help='Set nextstrain/nextclade version that will be pulled if online (see also --offline). Default: latest.')
+    advanced_args.add_argument('--nextclade_data_ver', type=str, default="latest", required=False, help='Set nextclade database to be used by nextclade. Default: latest.')
     advanced_args.add_argument('--keep_pangolin_ver', action='store_true', help='Will run the pipeline without updating pangolin (see also --offline). Default is updating pangolin.')
     advanced_args.add_argument('-u', '--user_id', type=int, default=1000, required=False, help='User id used to run docker commands, use "id -u" to find correct id. Default: 1000')
     advanced_args.add_argument('--generate_report_only', action='store_true', required=False, help='Do not run any tools, just (re)generate output report from already completed run. Default: off.')
@@ -434,8 +435,7 @@ def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline,keep
     print(combineCommand(pangolin_command))
     return pangolin_command
 
-
-def get_nextclade_command(run_name,consensus_dir,nextclade_version,nextclade_outdir,cpus,offline,dry_run,user_id):
+def get_nextclade_command(run_name,consensus_dir,nextclade_ver,nextclade_data_ver,nextclade_outdir,cpus,offline,dry_run,user_id):
     """Get the command used for running nextclade"""
     consensus_base=(run_name+'_sequences.fasta')
     ##TODO: ADD --jobs=str(cpus) to command - check if works
@@ -443,10 +443,16 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_version,nextclade_out
     if not Path(nextclade_outdir).is_dir():
         os.mkdir(nextclade_outdir)
     logging.info('Running nextclade with command: ')
-    if offline and nextclade_version=='latest':
+    # Setting nextclade version used
+    if offline and nextclade_ver=='latest':
         nextclade_image = 'nextstrain/nextclade'
     else:
-        nextclade_image = 'nextstrain/nextclade:{}'.format(nextclade_version)
+        nextclade_image = 'nextstrain/nextclade:{}'.format(nextclade_ver)
+    # Setting nextclade database version used
+    nextclade_dataset_tag = ''
+    if nextclade_data_ver != 'latest':
+        nextclade_dataset_tag = '--tag {} '.format(nextclade_data_ver)
+
     #get_nextclade_refs = []
     nextclade_command = []
     if not offline:
@@ -454,7 +460,8 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_version,nextclade_out
 
     nextclade_command += ['docker run --rm -u ',str(user_id),
                      ' --volume="',consensus_dir,
-                     ':/seq" ',nextclade_image,' nextclade dataset get --name=sars-cov-2 --output-dir=seq/data/sars-cov-2 ; ']
+                     ':/seq" ',nextclade_image,
+                     ' nextclade dataset get --name=sars-cov-2 ',nextclade_dataset_tag,'--output-dir=seq/data/sars-cov-2 ; ']
 
     nextclade_command += ['docker run --rm -u ',str(user_id),
                      ' --volume="',consensus_dir, 
@@ -832,6 +839,8 @@ def main():
         pipeline_commmand += ['\n- in offline mode']
     if not (args.offline and args.nextclade_ver=='latest'):
         pipeline_commmand += ['\n- use nextclade version:',str(args.nextclade_ver)]
+    if args.nextclade_data_ver != 'latest':
+        pipeline_commmand += ['\n- use nextclade dataset version:',str(args.nextclade_data_ver)]
     if args.keep_pangolin_ver:
         pipeline_commmand += ['\n- keep (i.e. not update) the pangolin version']
     if args.dry_run:
@@ -877,7 +886,7 @@ def main():
 
     ##Nextclade lineage assignment and substitutions
     if not args.generate_report_only:
-        nextclade_command=(get_nextclade_command(run_name,consensus_dir,args.nextclade_ver,nextclade_outdir,args.cpu,args.offline,args.dry_run,args.user_id))
+        nextclade_command=(get_nextclade_command(run_name,consensus_dir,args.nextclade_ver,args.nextclade_data_ver,nextclade_outdir,args.cpu,args.offline,args.dry_run,args.user_id))
         if not args.dry_run:
             run_command([combineCommand(nextclade_command)], shell=True)
         
