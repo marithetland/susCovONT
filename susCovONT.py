@@ -897,7 +897,7 @@ def main():
         generate_qc_report(run_name,artic_final_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name,consensus_dir,args.renormalise,str(args.normalise))
 
     #Move input files to 001_rawData directory
-    if not args.no_move_files or not args.dry_run:
+    if not (args.no_move_files or args.dry_run):
         move_input_files(outdir,raw_data_path)
 
     #Pipeline complete
