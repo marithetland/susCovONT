@@ -240,7 +240,7 @@ def set_config_variables(args):
     #Check if basecalling or demultiplexing is being performed and check that tools exist
     check_versions(conda_location,nf_dir_location,full_path)
 
-    return nf_dir_location, conda_location, schemeRepoURL#, nextclad_refdir_location
+    return nf_dir_location, conda_location, schemeRepoURL#, nextclade_refdir_location
 
 def get_sample_names(sample_names):
     """Check that the sample file exists and has correct format (try to edit if possible)"""
