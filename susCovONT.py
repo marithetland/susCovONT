@@ -365,7 +365,7 @@ def check_input(args):
             sequencing_summary=os.path.join(fastq_pass_alt,"sequencing_summary.txt")
 
     #Check that the specified sequencing summary actually exists
-    if not args.basecalling_model or not args.barcode_kit:
+    if not (args.basecalling_model or args.barcode_kit):
         if not args.seq_sum_file:
             seq_summary=os.path.abspath(sequencing_summary)
         if args.seq_sum_file:
