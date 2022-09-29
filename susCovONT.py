@@ -84,7 +84,7 @@ def parse_args():
 
     #Advanced options
     advanced_args.add_argument('-y', '--yes', action='store_true', help='Will run the pipeline non-interactively and give an automatic yes to all prompts. Default: off')
-    advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3','V4.1'], help='Specify primer kit: Default V4, options V3, V4 or V4.1.') #NEW
+    advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3','V4.1'], help='Specify primer kit: Default V4.1, options V3, V4 or V4.1.') #NEW
     advanced_args.add_argument('--normalise', type=int, default=500, required=False, help='Specify normalise value for artic minion. Default: 500')
     advanced_args.add_argument('--cpu', type=int, default=20, required=False, help='Specify cpus to use. Default: 20')
     advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions. For more specific options see --nexclade_ver and --keep_pangolin_ver. Default: off.')
