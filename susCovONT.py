@@ -414,9 +414,6 @@ def get_nextflow_command(primer_kit, demultiplexed_fastq, fast5_pass, sequencing
                      '--schemeRepoURL ', schemeRepoURL,
                      '--schemeVersion ', primer_kit,
                      '--outdir ', nf_outdir]
-    #if offline:
-        #nextflow_command += ['--schemeRepoURL ', schemeRepoURL]  #add option for offline running
-    #nextflow_command +=['2>&1 artic_log.txt']
     print(listToString(nextflow_command))
     
     return nextflow_command
