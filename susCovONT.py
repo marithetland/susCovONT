@@ -87,7 +87,7 @@ def parse_args():
     advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3','V4.1'], help='Specify primer kit: Default V4.1, options V3, V4 or V4.1.') #NEW
     advanced_args.add_argument('--normalise', type=int, default=500, required=False, help='Specify normalise value for artic minion. Default: 500')
     advanced_args.add_argument('--cpu', type=int, default=20, required=False, help='Specify cpus to use. Default: 20')
-    advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions. For more specific options see --nexclade_ver and --keep_pangolin_ver. Default: off.')
+    advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest nextclade and pangolin version each time it runs. Use this flag if you want to run offline with already installed versions. For more specific options see --nexclade_ver and --keep_pangolin_ver. Default: off.')
     advanced_args.add_argument('--nextclade_ver', type=str, default="latest", required=False, help='Set nextstrain/nextclade version that will be pulled if online (see also --offline). Default: latest.')
     advanced_args.add_argument('--nextclade_data_ver', type=str, default="latest", required=False, help='Set nextclade database to be used by nextclade. Default: latest.')
     advanced_args.add_argument('--keep_pangolin_ver', action='store_true', help='Will run the pipeline without updating pangolin (see also --offline). Default is updating pangolin.')
