@@ -468,8 +468,7 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_ver,nextclade_data_ve
                      ' --output-csv=\'/seq/nextclade.csv\''
                      ' --output-all=seq/data/nextclade'
                      ' --jobs=',str(cpus),' ; '
-                     'mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,
-                     ' & >> ',nextclade_outdir,'nextclade_log.txt ; '
+                     'mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,' ; '
                      'mv ',consensus_dir,'data/nextclade ',nextclade_outdir,' ; ']
 
     #Move tag file to record which nextclade database tag/version was used
