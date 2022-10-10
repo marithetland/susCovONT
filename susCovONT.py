@@ -467,12 +467,12 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_ver,nextclade_data_ve
                      ' /seq/',consensus_base,''
                      ' --output-csv=\'/seq/nextclade.csv\''
                      ' --output-all=seq/data/nextclade'
-                     ' --jobs=',str(cpus),' ; '
-                     'mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,' ; '
-                     'mv ',consensus_dir,'data/nextclade ',nextclade_outdir,' ; ']
+                     ' --jobs=',str(cpus),' ; ']
 
-    #Move tag file to record which nextclade database tag/version was used
-    nextclade_command += ['mv ',consensus_dir,'/data/sars-cov-2/tag.json ',nextclade_outdir,'/nextclade-tag.json']
+    #Move nextclade results and database information to the nextclade output folder
+    nextclade_command += ['mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,' ; '
+                     'mv ',consensus_dir,'data/nextclade ',nextclade_outdir,' ; '
+                     'mv ',consensus_dir,'/data/sars-cov-2/tag.json ',nextclade_outdir,'/nextclade-tag.json']
 
     print(combineCommand(nextclade_command))
     return nextclade_command
