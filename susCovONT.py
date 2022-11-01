@@ -42,6 +42,9 @@ from subprocess import call, check_output, CalledProcessError, STDOUT
 from pathlib import Path    
 from shutil import copyfile
 
+class CommandError(Exception):
+    pass
+
 #Options for basecalling and barcoding
 BASECALLING = collections.OrderedDict([
     ('r9.4_fast', ['--config dna_r9.4.1_450bps_fast.cfg ']), 
@@ -111,10 +114,10 @@ def run_command(command, **kwargs):
         exit_status = call(command_str, **kwargs)
     except OSError as e:
         message = "Command '{}' failed due to O/S error: {}".format(command_str, str(e))
-        raise CommandError({"Error:": message})
+        raise CommandError("Error: {}".format(message))
     if exit_status != 0:
         message = "Command '{}' failed with non-zero exit status: {}".format(command_str, exit_status)
-        raise CommandError({"Error:": message})
+        raise CommandError("Error: {}".format(message))
 
 def listToString(s):  
     """Join a list to string for running cmd with space delimiter"""
