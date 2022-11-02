@@ -41,8 +41,7 @@ The Dockerimage is made to be used with Docker-out-of-Docker (DooD), where we mo
 Assuming you have the sample_names.csv file in your `<run_name>` folder:
 
 ``` shell
-docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /absolute/path/to/<run_name>:/absolute/path/to/<run_name>
-cov:test python susCovONT.py --yes --user_id 0 --input_dir /absolute/path/to/<run_name> --sample_names /absolute/path/to/<run_name>/sample_names.csv
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /absolute/path/to/<run_name>:/absolute/path/to/<run_name> tinytyranid/suscovont:latest python susCovONT.py --yes --user_id 0 --input_dir /absolute/path/to/<run_name> --sample_names /absolute/path/to/<run_name>/sample_names.csv
 ```
 
 Where:
