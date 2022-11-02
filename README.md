@@ -34,9 +34,9 @@ The barcode column can take values following the format barcode[0-9][0-9] or NB[
 
 Note: Basecalling and demultiplexing may also be performed if not already done on GridION/MinIT.
 
-## Basic usage using Dockerfile/image
+## Basic usage using Dockerimage
 
-The Dockerfile/image is made to be used with Docker-out-of-Docker (DooD), where we mount `/var/run/docker.sock` into our container and our container will start new containers that are "siblings" to the one we started it from, and thus runs them in the context of the host. Due to this we have to use absolute paths when mounting volumes and setting `--input_dir` and `--sample_names`. 
+The Dockerimage is made to be used with Docker-out-of-Docker (DooD), where we mount `/var/run/docker.sock` into our container and our container will start new containers that are "siblings" to the one we started it from, and thus runs them in the context of the host. Due to this we have to use absolute paths when mounting volumes and setting `--input_dir` and `--sample_names`. 
 
 Assuming you have the sample_names.csv file in your `<run_name>` folder:
 
@@ -50,7 +50,9 @@ Where:
 * `--user_id`: User id used to run docker commands (default: 1000), here we want to use 0 for root. 
 * `--input_dir` and `--sample_names` are described above
 
-For increased reproducibility also consider specifying the Nextclade version with `--nextclade_ver`. Pangolin version used can be found in the generated report (and later be specified in the Dockerfile and then be run with `--keep_pangolin_ver` to run the pipeline without updating Pangolin) and Nextclade database version used can be found in the output folder `005_nextclade/nextclade-tag.json` (and later be specified with `--nextclade_data_ver`). Please note that the Nextclade version is currently not recorded, so it is recommended to set this with `--nextclade_ver` if staying in control of the version is important for your use case.
+For increased reproducibility also consider specifying the Nextclade version with `--nextclade_ver` option.
+
+If one would like to rerun a data set with the pipeline with the same Pangolin version, the version used for in the original run can be found the the generated report. This version should be specified in the Dockerfile, the image rebuilt and the pipeline rerun with the `--keep_pangolin_ver` option to avoid updating Pangolin. The Nextclade database version can be found in the output file `005_nextclade/nextclade-tag.json` and be specified with `--nextclade_data_ver` option. Please note that the Nextclade version is currently not recorded, so it is recommended to set this with `--nextclade_ver` option if staying in control of the version is important for your use case.
 
 ## Please see the wiki for more information:
 * [What does the pipeline do?](https://github.com/marithetland/covid-genomics/wiki/What-does-it-do%3F)
