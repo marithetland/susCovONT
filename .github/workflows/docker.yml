@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - feature/make-dockerfile
 
 jobs:
   push_to_registry:
@@ -18,6 +19,19 @@ jobs:
         uses: hadolint/hadolint-action@v2.1.0
         with:
           dockerfile: Dockerfile
+    -
+        name: Docker Meta
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: |
+            ${{ secrets.DOCKER_USERNAME }}/suscovont
+          tags: |
+            latest
+            type=sha,format=long
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
       -
         name: Login to DockerHub
         uses: docker/login-action@v2.1.0
@@ -29,4 +43,4 @@ jobs:
         uses: docker/build-push-action@v3.2.0
         with:
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/suscovont:${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
