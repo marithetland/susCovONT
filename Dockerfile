@@ -65,7 +65,7 @@ RUN mamba env create --prefix /conda_for_covid/work/conda/artic-2c6f8ebeb615d37e
 # Get primer schemes
 RUN git clone https://github.com/markus-soma/primer-schemes.git
 WORKDIR /primer-schemes
-RUN git reset --hard $primer_schemes_sha
+RUN git checkout $primer_schemes_sha
 WORKDIR /
 
 # Change config file
