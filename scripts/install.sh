@@ -82,8 +82,10 @@ mkdir $CONDA_LOCATION
 if testcmd mamba ; then
     echo "Found mamba, this will speed up the installation."
     mamba env create --prefix ${CONDA_LOCATION}/work/conda/artic-d6bee2bdeda54d67a6a5121cb8a4e56c --file ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml
+    mamba env create --prefix ${CONDA_LOCATION}/work/conda/extras-65030c652c1e6445a0e32644470c48ee -f ${INSTALL_DIR}/environments/extras.yml
 else
     conda env create --prefix ${CONDA_LOCATION}/work/conda/artic-d6bee2bdeda54d67a6a5121cb8a4e56c --file ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml
+    conda env create --prefix ${CONDA_LOCATION}/work/conda/extras-65030c652c1e6445a0e32644470c48ee -f ${INSTALL_DIR}/environments/extras.yml
 fi
 
 ## Download primer schemes to be used in offline mode
