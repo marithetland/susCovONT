@@ -59,8 +59,11 @@ RUN mamba install -y \
 RUN git clone -b $ncov_artic_ver https://github.com/connor-lab/ncov2019-artic-nf && \
     sed -i.bak "s/artic=1.1.3/artic=$artic_ver/g" /ncov2019-artic-nf/environments/nanopore/environment.yml && \
     cp /scripts/articQC.py /ncov2019-artic-nf/bin/qc.py
-RUN mamba env create --prefix /conda_for_covid/work/conda/artic-2c6f8ebeb615d37ee3372e543ec21891 -f /ncov2019-artic-nf/environments/nanopore/environment.yml \
+RUN mamba env create --prefix /conda_for_covid/work/conda/artic-d6bee2bdeda54d67a6a5121cb8a4e56c -f /ncov2019-artic-nf/environments/nanopore/environment.yml \
     && mamba clean -a
+RUN mamba env create --prefix /conda_for_covid/work/conda/extras-65030c652c1e6445a0e32644470c48ee -f /ncov2019-artic-nf/environments/extras.yml \
+    && mamba clean -a
+
 
 # Get primer schemes
 RUN git clone https://github.com/markus-soma/primer-schemes.git
