@@ -195,7 +195,7 @@ def check_versions(conda_location,nf_dir_location,full_path):
     return
 
     #check_artic_version(conda_location):
-    run_command(['echo "artic \t" >> ',full_path,'/pipeline_versions.txt ; ',conda_location,'/artic-2c6f8ebeb615d37ee3372e543ec21891/bin/artic --version >> ',full_path,'/pipeline_versions.txt'], shell=True) ##Check for empty results, skip
+    run_command(['echo "artic \t" >> ',full_path,'/pipeline_versions.txt ; ',conda_location,'/artic-d6bee2bdeda54d67a6a5121cb8a4e56c/bin/artic --version >> ',full_path,'/pipeline_versions.txt'], shell=True) ##Check for empty results, skip
     pass
 
 # def check_pangolin_version():
@@ -727,7 +727,7 @@ def run_artic_minion(primer_kit, barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_
     #Get barcode path
     barcode_path=os.path.join(nf_outdir,'articNcovNanopore_sequenceAnalysisNanopolish_articGuppyPlex/')
     
-    re_normalise_command = ['bash -c "source activate ',conda_location,'artic-2c6f8ebeb615d37ee3372e543ec21891 ; ',]
+    re_normalise_command = ['bash -c "source activate ',conda_location,'artic-d6bee2bdeda54d67a6a5121cb8a4e56c ; ',]
     re_normalise_command += ['artic minion --normalise 0 --threads ', str(cpu),
                             ' --scheme-directory ', schemeRepoURL,
                             ' --read-file ', barcode_path, barcode, '.fastq'
