@@ -21,10 +21,10 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG TZ=Europe/Oslo
 RUN apt-get update && \
     apt-get install --yes --no-install-recommends \
-    git=1:2.25.1-1ubuntu3.6 \
-    ca-certificates=20211016~20.04.1 \
+    git=1:2.25.1-1ubuntu3.10 \
+    ca-certificates=20211016ubuntu0.20.04.1 \
     python3=3.8.2-0ubuntu2 \
-    openjdk-8-jre=8u342-b07-0ubuntu1~20.04 \
+    openjdk-8-jre=8u352-ga-1~20.04 \
     wget=1.20.3-1ubuntu2 \
     docker.io=20.10.12-0ubuntu2~20.04.1 \
     && rm -rf /var/lib/apt/lists/*
@@ -59,8 +59,11 @@ RUN mamba install -y \
 RUN git clone -b $ncov_artic_ver https://github.com/connor-lab/ncov2019-artic-nf && \
     sed -i.bak "s/artic=1.1.3/artic=$artic_ver/g" /ncov2019-artic-nf/environments/nanopore/environment.yml && \
     cp /scripts/articQC.py /ncov2019-artic-nf/bin/qc.py
-RUN mamba env create --prefix /conda_for_covid/work/conda/artic-2c6f8ebeb615d37ee3372e543ec21891 -f /ncov2019-artic-nf/environments/nanopore/environment.yml \
+RUN mamba env create --prefix /conda_for_covid/work/conda/artic-d6bee2bdeda54d67a6a5121cb8a4e56c -f /ncov2019-artic-nf/environments/nanopore/environment.yml \
     && mamba clean -a
+RUN mamba env create --prefix /conda_for_covid/work/conda/extras-65030c652c1e6445a0e32644470c48ee -f /ncov2019-artic-nf/environments/extras.yml \
+    && mamba clean -a
+
 
 # Get primer schemes
 RUN git clone https://github.com/markus-soma/primer-schemes.git
