@@ -69,21 +69,23 @@ esac
 ## Git clone artic nextflow pipeline
 echo "##### Cloning artic nextflow pipeline to ${INSTALL_DIR}/ncov2019-artic-nf"
 cd $INSTALL_DIR
-git clone https://github.com/connor-lab/ncov2019-artic-nf
-sed -i.bak 's/artic=1.1.3/artic=1.2.1/g' ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml #Change "1.2.1" to desired artic version
+git clone -b v1.3.0 https://github.com/connor-lab/ncov2019-artic-nf
+sed -i.bak 's/artic=1.1.3/artic=1.2.3/g' ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml #Change "1.1.3" to desired artic version
 cp ${INSTALL_DIR}/susCovONT/scripts/articQC.py ncov2019-artic-nf/bin/qc.py #Update the QC script with the one from this repository.
 
 ## Create conda env to use as --cache for nextflow pipeline
-echo "##### Creating conda environment with artic v1.2.1 (uses conda)"
+echo "##### Creating conda environment with artic v1.2.3 (uses conda)"
 echo "##### Bear with us, this takes a little while..."
 cd $INSTALL_DIR
 CONDA_LOCATION=$(echo "${INSTALL_DIR}/conda_for_covid/") #Change this to match your system
 mkdir $CONDA_LOCATION
 if testcmd mamba ; then
     echo "Found mamba, this will speed up the installation."
-    mamba env create --prefix ${CONDA_LOCATION}/work/conda/artic-2c6f8ebeb615d37ee3372e543ec21891 --file ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml
+    mamba env create --prefix ${CONDA_LOCATION}/work/conda/artic-d6bee2bdeda54d67a6a5121cb8a4e56c --file ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml
+    mamba env create --prefix ${CONDA_LOCATION}/work/conda/extras-65030c652c1e6445a0e32644470c48ee -f ${INSTALL_DIR}/environments/extras.yml
 else
-    conda env create --prefix ${CONDA_LOCATION}/work/conda/artic-2c6f8ebeb615d37ee3372e543ec21891 --file ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml
+    conda env create --prefix ${CONDA_LOCATION}/work/conda/artic-d6bee2bdeda54d67a6a5121cb8a4e56c --file ${INSTALL_DIR}/ncov2019-artic-nf/environments/nanopore/environment.yml
+    conda env create --prefix ${CONDA_LOCATION}/work/conda/extras-65030c652c1e6445a0e32644470c48ee -f ${INSTALL_DIR}/environments/extras.yml
 fi
 
 ## Download primer schemes to be used in offline mode
@@ -96,7 +98,7 @@ git clone https://github.com/markus-soma/primer-schemes.git
 ## Install pangolin
 echo "##### Installing pangolin (uses conda)"
 cd $INSTALL_DIR
-git clone https://github.com/cov-lineages/pangolin.git
+git clone -b v4.1.2 https://github.com/cov-lineages/pangolin.git
 cd ${INSTALL_DIR}/pangolin
 if testcmd mamba ; then
     echo "Found mamba, this will speed up the installation."
@@ -109,7 +111,7 @@ bash -c "source activate pangolin ; conda activate pangolin ; python setup.py in
 ## Pull nextclade image
 echo "##### Pulling nextclade (uses docker)"
 cd $INSTALL_DIR
-docker pull nextstrain/nextclade
+docker pull nextstrain/nextclade:2.5.0
 
 ## Change config file
 echo "##### Updating paths in file ${INSTALL_DIR}/susCovONT/scripts/config.cfg"

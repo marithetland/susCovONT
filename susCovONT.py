@@ -9,7 +9,7 @@
 # Created: 2021-01-24
 #
 # Prerequisites:
-#	 biopython, pandas, numpy, nextflow v20+
+#	 biopython, pandas, numpy, nextflow v20.01.0 - v21.10.6
 #
 #
 # Example command:
@@ -41,6 +41,9 @@ import tempfile
 from subprocess import call, check_output, CalledProcessError, STDOUT
 from pathlib import Path    
 from shutil import copyfile
+
+class CommandError(Exception):
+    pass
 
 #Options for basecalling and barcoding
 BASECALLING = collections.OrderedDict([
@@ -83,14 +86,19 @@ def parse_args():
     basecalling_args.add_argument('--guppy_use_cpu', action='store_true', required=False, help='This flag can be used with --basecalling to run on CPU instead of GPU. Will use 4 threads and 6 callers. Default: GPU -auto x.')
 
     #Advanced options
-    advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3','V4.1'], help='Specify primer kit: Default V4, options V3, V4 or V4.1.') #NEW
+    advanced_args.add_argument('-y', '--yes', action='store_true', help='Will run the pipeline non-interactively and give an automatic yes to all prompts. Default: off')
+    advanced_args.add_argument('-p','--primer_kit', type=str, required=False, choices=['V4','V3','V4.1'], help='Specify primer kit: Default V4.1, options V3, V4 or V4.1.') #NEW
     advanced_args.add_argument('--normalise', type=int, default=500, required=False, help='Specify normalise value for artic minion. Default: 500')
     advanced_args.add_argument('--cpu', type=int, default=20, required=False, help='Specify cpus to use. Default: 20')
+    advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest nextclade and pangolin version each time it runs. Use this flag if you want to run offline with already installed versions. For more specific options see --nexclade_ver and --keep_pangolin_ver. Default: off.')
+    advanced_args.add_argument('--nextclade_ver', type=str, default="latest", required=False, help='Set nextstrain/nextclade version that will be pulled if online (see also --offline). Default: latest.')
+    advanced_args.add_argument('--nextclade_data_ver', type=str, default="latest", required=False, help='Set nextclade database to be used by nextclade. Default: latest.')
+    advanced_args.add_argument('--keep_pangolin_ver', action='store_true', help='Will run the pipeline without updating pangolin (see also --offline). Default is updating pangolin.')
+    advanced_args.add_argument('-u', '--user_id', type=int, default=1000, required=False, help='User id used to run docker commands, use "id -u" to find correct id. Default: 1000')
     advanced_args.add_argument('--generate_report_only', action='store_true', required=False, help='Do not run any tools, just (re)generate output report from already completed run. Default: off.')
-    advanced_args.add_argument('--offline', action='store_true', required=False, help='The script downloads the newest primer schemes, nextclade and pangolin each time it runs. Use this flag if you want to run offline with already installed versions.fault: off.')
     advanced_args.add_argument('--no_move_files', action='store_true', required=False, help='By default, the input fast5_pass and fastq_pass dirs will be moved to subdir 001_rawData. Use this flag if you do not want that')
     advanced_args.add_argument('--no_artic', action='store_true', required=False, help='Use this flag to run only pangolin and nextclade on an already completed artic nextflow (with same folder structure)')
-    advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="off", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default=off.')
+    advanced_args.add_argument('--renormalise', type=str, required=False, choices=["on","off"], default="off", help='Turn on/off re-running artic minion with normalise 0 for samples w 90-97 perc coverage. Default: off.')
     advanced_args.add_argument('--dry_run', action='store_true', required=False, help='Executes nothing. Prints the commands that would have been run in a non-dry run.')
     advanced_args.add_argument('--seq_sum_file', type=pathlib.Path, required=False, help='If the pipeline does not find the sequence sumamry file, you can specify it. Generally not needed.')
 
@@ -106,10 +114,10 @@ def run_command(command, **kwargs):
         exit_status = call(command_str, **kwargs)
     except OSError as e:
         message = "Command '{}' failed due to O/S error: {}".format(command_str, str(e))
-        raise CommandError({"Error:": message})
+        raise CommandError("Error: {}".format(message))
     if exit_status != 0:
         message = "Command '{}' failed with non-zero exit status: {}".format(command_str, exit_status)
-        raise CommandError({"Error:": message})
+        raise CommandError("Error: {}".format(message))
 
 def listToString(s):  
     """Join a list to string for running cmd with space delimiter"""
@@ -146,9 +154,12 @@ def check_barcodeID(value, pattern=re.compile("barcode[0-9][0-9]")):
     """Check that barcode in sample_names follows the correct pattern"""
     return 'TRUE' if pattern.match(value) else 'FALSE'
     
-def yes_or_no(question):
-    """Ask user a yes/no question"""
-    reply = str(input(question+' (y/n): ')).lower().strip()
+def yes_or_no(question, automatic_yes):
+    """Ask user a yes/no question unless automatic yes is selected"""
+    if automatic_yes:
+        reply='y'
+    else:
+        reply = str(input(question+' (y/n): ')).lower().strip()
     if reply[0] == 'y':
         print("Starting pipeline")
         return 1
@@ -184,7 +195,7 @@ def check_versions(conda_location,nf_dir_location,full_path):
     return
 
     #check_artic_version(conda_location):
-    run_command(['echo "artic \t" >> ',full_path,'/pipeline_versions.txt ; ',conda_location,'/artic-2c6f8ebeb615d37ee3372e543ec21891/bin/artic --version >> ',full_path,'/pipeline_versions.txt'], shell=True) ##Check for empty results, skip
+    run_command(['echo "artic \t" >> ',full_path,'/pipeline_versions.txt ; ',conda_location,'/artic-d6bee2bdeda54d67a6a5121cb8a4e56c/bin/artic --version >> ',full_path,'/pipeline_versions.txt'], shell=True) ##Check for empty results, skip
     pass
 
 # def check_pangolin_version():
@@ -357,7 +368,7 @@ def check_input(args):
             sequencing_summary=os.path.join(fastq_pass_alt,"sequencing_summary.txt")
 
     #Check that the specified sequencing summary actually exists
-    if not args.basecalling_model or not args.barcode_kit:
+    if not (args.basecalling_model or args.barcode_kit):
         if not args.seq_sum_file:
             seq_summary=os.path.abspath(sequencing_summary)
         if args.seq_sum_file:
@@ -406,18 +417,15 @@ def get_nextflow_command(primer_kit, demultiplexed_fastq, fast5_pass, sequencing
                      '--schemeRepoURL ', schemeRepoURL,
                      '--schemeVersion ', primer_kit,
                      '--outdir ', nf_outdir]
-    #if offline:
-        #nextflow_command += ['--schemeRepoURL ', schemeRepoURL]  #add option for offline running
-    #nextflow_command +=['2>&1 artic_log.txt']
     print(listToString(nextflow_command))
     
     return nextflow_command
 
-def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
+def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline,keep_pangolin_ver):
     """Get the command used for running pangolin"""
     logging.info('Running pangolin with command: ')
     pangolin_command = ['bash -c "source activate pangolin ; ',]
-    if not offline:
+    if not (offline or keep_pangolin_ver):
         pangolin_command +=[' pangolin --update ; ',] #This takes approx 4 minutes, so consider turning off.
     pangolin_command += [' pangolin ', consensus_file,
                         ' --outdir ', pangolin_outdir,
@@ -427,8 +435,7 @@ def get_pangolin_command(consensus_file,pangolin_outdir,number_CPUs,offline):
     print(combineCommand(pangolin_command))
     return pangolin_command
 
-
-def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,dry_run):
+def get_nextclade_command(run_name,consensus_dir,nextclade_ver,nextclade_data_ver,nextclade_outdir,cpus,offline,dry_run,user_id):
     """Get the command used for running nextclade"""
     consensus_base=(run_name+'_sequences.fasta')
     ##TODO: ADD --jobs=str(cpus) to command - check if works
@@ -436,27 +443,39 @@ def get_nextclade_command(run_name,consensus_dir,nextclade_outdir,cpus,offline,d
     if not Path(nextclade_outdir).is_dir():
         os.mkdir(nextclade_outdir)
     logging.info('Running nextclade with command: ')
+    # Setting nextclade version used
+    if offline and nextclade_ver=='latest':
+        nextclade_image = 'nextstrain/nextclade'
+    else:
+        nextclade_image = 'nextstrain/nextclade:{}'.format(nextclade_ver)
+    # Setting nextclade database version used
+    nextclade_dataset_tag = ''
+    if nextclade_data_ver != 'latest':
+        nextclade_dataset_tag = '--tag {} '.format(nextclade_data_ver)
+
     #get_nextclade_refs = []
     nextclade_command = []
     if not offline:
-        nextclade_command = ['docker pull nextstrain/nextclade ; '] 
+        nextclade_command = ['docker pull ',nextclade_image,' ; ']
 
-    nextclade_command += ['docker run --rm -u 1000' #Note this is not always 1000, use 'id -u' to find correct id
-                     ' --volume="',consensus_dir, 
-                     ':/seq" nextstrain/nextclade nextclade dataset get --name=sars-cov-2 --output-dir=seq/data/sars-cov-2 ; ']
+    nextclade_command += ['docker run --rm -u ',str(user_id),
+                     ' --volume="',consensus_dir,
+                     ':/seq" ',nextclade_image,
+                     ' nextclade dataset get --name=sars-cov-2 ',nextclade_dataset_tag,'--output-dir=seq/data/sars-cov-2 ; ']
 
-    nextclade_command += ['docker run --rm -u 1000' #Note this is not always 1000, use 'id -u' to find correct id
+    nextclade_command += ['docker run --rm -u ',str(user_id),
                      ' --volume="',consensus_dir, 
-                     ':/seq" nextstrain/nextclade nextclade run' 
+                     ':/seq" ',nextclade_image,' nextclade run',
                      ' --input-dataset=\'/seq/data/sars-cov-2\''
                      ' /seq/',consensus_base,''
                      ' --output-csv=\'/seq/nextclade.csv\''
                      ' --output-all=seq/data/nextclade'
-                     ' --jobs=',str(cpus),' ; '
-                     'mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,
-                     ' & >> ',nextclade_outdir,'nextclade_log.txt ; '
-                     'mv ',consensus_dir,'data/nextclade ',nextclade_outdir]
+                     ' --jobs=',str(cpus),' ; ']
 
+    #Move nextclade results and database information to the nextclade output folder
+    nextclade_command += ['mv ',consensus_dir,'nextclade.csv ',nextclade_outdir,' ; '
+                     'mv ',consensus_dir,'data/nextclade ',nextclade_outdir,' ; '
+                     'mv ',consensus_dir,'/data/sars-cov-2/tag.json ',nextclade_outdir,'/nextclade-tag.json']
 
     print(combineCommand(nextclade_command))
     return nextclade_command
@@ -708,7 +727,7 @@ def run_artic_minion(primer_kit, barcode,nf_outdir,cpu,schemeRepoURL,fast5_pass_
     #Get barcode path
     barcode_path=os.path.join(nf_outdir,'articNcovNanopore_sequenceAnalysisNanopolish_articGuppyPlex/')
     
-    re_normalise_command = ['bash -c "source activate ',conda_location,'artic-2c6f8ebeb615d37ee3372e543ec21891 ; ',]
+    re_normalise_command = ['bash -c "source activate ',conda_location,'artic-d6bee2bdeda54d67a6a5121cb8a4e56c ; ',]
     re_normalise_command += ['artic minion --normalise 0 --threads ', str(cpu),
                             ' --scheme-directory ', schemeRepoURL,
                             ' --read-file ', barcode_path, barcode, '.fastq'
@@ -800,8 +819,11 @@ def main():
     print("Your barcodes are specified in: " + os.path.abspath(args.sample_names))
     print("And the sequencing summary txt file is: " + os.path.abspath(sequencing_summary))
     print("The primer kit is: " + primer_kit)
+    print("User id used for docker is: " + str(args.user_id))
 
     pipeline_commmand = ['The susCovONT pipeline will: ']
+    if args.yes:
+        pipeline_commmand += ['\n- run non-interactively and answer yes to all prompts']
     if args.basecalling_model:
         pipeline_commmand += ['\n- run basecalling with model', args.basecalling_model.lower()] 
     if args.barcode_kit:
@@ -815,7 +837,13 @@ def main():
     if args.generate_report_only:
         pipeline_commmand += ['\n- only (re)create output report from already completed pipeline run'] 
     if args.offline:
-        pipeline_commmand += ['\n- in offline mode'] 
+        pipeline_commmand += ['\n- in offline mode']
+    if not (args.offline and args.nextclade_ver=='latest'):
+        pipeline_commmand += ['\n- use nextclade version:',str(args.nextclade_ver)]
+    if args.nextclade_data_ver != 'latest':
+        pipeline_commmand += ['\n- use nextclade dataset version:',str(args.nextclade_data_ver)]
+    if args.keep_pangolin_ver:
+        pipeline_commmand += ['\n- keep (i.e. not update) the pangolin version']
     if args.dry_run:
         pipeline_commmand += ['\n- in dry mode (no execution of commands)'] 
     if not args.dry_run and not args.generate_report_only:
@@ -824,7 +852,7 @@ def main():
     print(listToString(pipeline_commmand))
 
     while True:
-        if(yes_or_no('Would you like to run this pipeline? y/n: ')):
+        if(yes_or_no('Would you like to run this pipeline? y/n: ', args.yes)):
             break
 
     ##Run pipeline
@@ -853,13 +881,13 @@ def main():
     ##Pangolin lineage assignment - this worksish  (must add consensus_dir)
     if not args.generate_report_only:  
         consensus_file=combine_consensus_files(consensus_dir, run_name)      
-        pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir,args.cpu,args.offline))
+        pangolin_command=(get_pangolin_command(consensus_file,pangolin_outdir,args.cpu,args.offline,args.keep_pangolin_ver))
         if not args.dry_run:    
             run_command([combineCommand(pangolin_command)], shell=True)
 
     ##Nextclade lineage assignment and substitutions
     if not args.generate_report_only:
-        nextclade_command=(get_nextclade_command(run_name,consensus_dir,nextclade_outdir,args.cpu,args.offline,args.dry_run))
+        nextclade_command=(get_nextclade_command(run_name,consensus_dir,args.nextclade_ver,args.nextclade_data_ver,nextclade_outdir,args.cpu,args.offline,args.dry_run,args.user_id))
         if not args.dry_run:
             run_command([combineCommand(nextclade_command)], shell=True)
         
@@ -870,7 +898,7 @@ def main():
         generate_qc_report(run_name,artic_final_qc,nextclade_outfile,pangolin_outfile,sample_df,final_report_name,consensus_dir,args.renormalise,str(args.normalise))
 
     #Move input files to 001_rawData directory
-    if not args.no_move_files or not args.dry_run:
+    if not (args.no_move_files or args.dry_run):
         move_input_files(outdir,raw_data_path)
 
     #Pipeline complete
